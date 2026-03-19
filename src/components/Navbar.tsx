@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import Image from "next/image";
 import {
+  LayoutDashboard,
   FileText,
   Users,
   Receipt,
@@ -15,7 +16,8 @@ import {
 } from "lucide-react";
 
 const links = [
-  { href: "/", label: "Invoices", icon: FileText },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -46,10 +48,9 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-1">
             {links.map((link) => {
               const Icon = link.icon;
-              const isActive =
-                link.href === "/"
-                  ? pathname === "/" || pathname.startsWith("/invoices")
-                  : pathname.startsWith(link.href);
+              const isActive = (link as any).exact
+                  ? pathname === link.href
+                  : pathname === link.href || pathname.startsWith(link.href + "/");
               return (
                 <Link
                   key={link.href}
@@ -89,10 +90,9 @@ export default function Navbar() {
           <div className="md:hidden pb-3 border-t border-gray-100 mt-1 pt-2 space-y-1">
             {links.map((link) => {
               const Icon = link.icon;
-              const isActive =
-                link.href === "/"
-                  ? pathname === "/" || pathname.startsWith("/invoices")
-                  : pathname.startsWith(link.href);
+              const isActive = (link as any).exact
+                  ? pathname === link.href
+                  : pathname === link.href || pathname.startsWith(link.href + "/");
               return (
                 <Link
                   key={link.href}
