@@ -13,7 +13,7 @@ export async function PUT(request: Request) {
     name, address, state, country, gstin, pan, hsn_code,
     bank_name, account_name, account_number, ifsc, swift_code,
     email, phone, cin,
-    invoice_prefix, invoice_next_number,
+    invoice_prefix, invoice_next_number, fy_start_month,
   } = body;
 
   await adminDb.collection("company").doc("default").set({
@@ -35,6 +35,7 @@ export async function PUT(request: Request) {
     logo_path: "/portx-logo.png",
     invoice_prefix: invoice_prefix || "A",
     invoice_next_number: invoice_next_number || 1,
+    fy_start_month: fy_start_month || 4,
   }, { merge: true });
 
   const doc = await adminDb.collection("company").doc("default").get();

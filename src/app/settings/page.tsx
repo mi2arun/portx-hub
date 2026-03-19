@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Landmark, Hash, Loader2, Check } from "lucide-react";
+import { Building2, Landmark, Hash, Loader2, Check, CalendarDays } from "lucide-react";
 
 type Company = {
   name: string;
@@ -21,6 +21,7 @@ type Company = {
   cin: string;
   invoice_prefix: string;
   invoice_next_number: number;
+  fy_start_month: number; // 4 = April (Indian FY)
 };
 
 export default function SettingsPage() {
@@ -28,7 +29,7 @@ export default function SettingsPage() {
     name: "", address: "", state: "", country: "", gstin: "", pan: "", hsn_code: "",
     bank_name: "", account_name: "", account_number: "", ifsc: "", swift_code: "",
     email: "", phone: "", cin: "",
-    invoice_prefix: "A", invoice_next_number: 1,
+    invoice_prefix: "A", invoice_next_number: 1, fy_start_month: 4,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -162,27 +163,71 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Invoice Numbering */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden lg:w-1/2">
-          <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-            <Hash className="w-4 h-4 text-violet-500" />
-            <h2 className="text-sm font-semibold text-gray-900">Invoice Numbering</h2>
-          </div>
-          <div className="p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>Prefix</label>
-                <input value={form.invoice_prefix} onChange={(e) => update("invoice_prefix", e.target.value)} placeholder="A" className={inputClass} />
-                <p className="text-xs text-gray-400 mt-1">e.g., A, INV, PI</p>
+        {/* Bottom row: Invoice Numbering + Financial Year */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Invoice Numbering */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+              <Hash className="w-4 h-4 text-violet-500" />
+              <h2 className="text-sm font-semibold text-gray-900">Invoice Numbering</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Prefix</label>
+                  <input value={form.invoice_prefix} onChange={(e) => update("invoice_prefix", e.target.value)} placeholder="A" className={inputClass} />
+                  <p className="text-xs text-gray-400 mt-1">e.g., A, INV, PI</p>
+                </div>
+                <div>
+                  <label className={labelClass}>Next Number</label>
+                  <input type="number" min="1" value={form.invoice_next_number}
+                    onChange={(e) => update("invoice_next_number", Math.max(1, Number(e.target.value)))} className={inputClass} />
+                </div>
               </div>
-              <div>
-                <label className={labelClass}>Next Number</label>
-                <input type="number" min="1" value={form.invoice_next_number}
-                  onChange={(e) => update("invoice_next_number", Math.max(1, Number(e.target.value)))} className={inputClass} />
+              <div className="bg-violet-50 rounded-lg px-4 py-3 text-sm">
+                Next invoice: <span className="font-mono font-semibold text-violet-700">{form.invoice_prefix}{String(form.invoice_next_number).padStart(5, "0")}</span>
               </div>
             </div>
-            <div className="bg-violet-50 rounded-lg px-4 py-3 text-sm">
-              Next invoice: <span className="font-mono font-semibold text-violet-700">{form.invoice_prefix}{String(form.invoice_next_number).padStart(5, "0")}</span>
+          </div>
+
+          {/* Financial Year */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+              <CalendarDays className="w-4 h-4 text-violet-500" />
+              <h2 className="text-sm font-semibold text-gray-900">Financial Year</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className={labelClass}>FY Start Month</label>
+                <select value={form.fy_start_month}
+                  onChange={(e) => update("fy_start_month", Number(e.target.value))}
+                  className={inputClass}>
+                  <option value={1}>January</option>
+                  <option value={2}>February</option>
+                  <option value={3}>March</option>
+                  <option value={4}>April (India Standard)</option>
+                  <option value={5}>May</option>
+                  <option value={6}>June</option>
+                  <option value={7}>July</option>
+                  <option value={8}>August</option>
+                  <option value={9}>September</option>
+                  <option value={10}>October</option>
+                  <option value={11}>November</option>
+                  <option value={12}>December</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Used for date filters and reports</p>
+              </div>
+              <div className="bg-violet-50 rounded-lg px-4 py-3 text-sm">
+                {(() => {
+                  const m = form.fy_start_month || 4;
+                  const now = new Date();
+                  const year = now.getMonth() + 1 >= m ? now.getFullYear() : now.getFullYear() - 1;
+                  const endYear = m === 1 ? year : year + 1;
+                  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                  const endMonth = m === 1 ? 12 : m - 1;
+                  return <>Current FY: <span className="font-semibold text-violet-700">{months[m-1]} {year} — {months[endMonth-1]} {endYear}</span></>;
+                })()}
+              </div>
             </div>
           </div>
         </div>

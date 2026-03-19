@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { formatCurrency } from "@/lib/currency";
 import { EXPENSE_CATEGORIES } from "@/lib/types";
 import { TableSkeleton, CardsSkeleton } from "@/components/Skeleton";
+import DateFilter from "@/components/DateFilter";
 import {
   Plus, Search, Filter, Receipt, X, Pencil, Trash2,
-  Loader2, Download, TrendingDown, Calendar, Tag,
-  CreditCard, RefreshCw,
+  Loader2, Download, TrendingDown, Tag,
+  Calendar, RefreshCw,
 } from "lucide-react";
 
 type Expense = {
@@ -68,6 +69,7 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [dateRange, setDateRange] = useState({ from: "", to: "" });
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -151,7 +153,9 @@ export default function ExpensesPage() {
       e.description?.toLowerCase().includes(q) ||
       e.category?.toLowerCase().includes(q);
     const matchesCategory = categoryFilter === "all" || e.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    const matchesFrom = !dateRange.from || e.date >= dateRange.from;
+    const matchesTo = !dateRange.to || e.date <= dateRange.to;
+    return matchesSearch && matchesCategory && matchesFrom && matchesTo;
   });
 
   const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
@@ -359,9 +363,9 @@ export default function ExpensesPage() {
             </div>
           ) : (
             <>
-              {/* Search & Filter */}
+              {/* Search, Filter & Date */}
               <div className="flex gap-3 mb-4 flex-wrap">
-                <div className="relative flex-1 min-w-[200px]">
+                <div className="relative flex-1 min-w-[180px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input type="text" placeholder="Search expenses..."
                     value={search} onChange={(e) => setSearch(e.target.value)}
@@ -375,6 +379,7 @@ export default function ExpensesPage() {
                     {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
+                <DateFilter value={dateRange} onChange={setDateRange} />
               </div>
 
               {/* Table */}

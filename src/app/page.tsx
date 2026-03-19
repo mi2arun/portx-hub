@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
 import { TableSkeleton, CardsSkeleton } from "@/components/Skeleton";
+import DateFilter from "@/components/DateFilter";
 import {
   Plus,
   Download,
@@ -53,6 +54,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [dateRange, setDateRange] = useState({ from: "", to: "" });
 
   useEffect(() => {
     fetch("/api/invoices")
@@ -67,7 +69,9 @@ export default function Dashboard() {
       inv.invoice_number?.toLowerCase().includes(q) ||
       inv.client_name?.toLowerCase().includes(q);
     const matchesStatus = statusFilter === "all" || inv.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesFrom = !dateRange.from || inv.invoice_date >= dateRange.from;
+    const matchesTo = !dateRange.to || inv.invoice_date <= dateRange.to;
+    return matchesSearch && matchesStatus && matchesFrom && matchesTo;
   });
 
   const counts = invoices.reduce(
@@ -150,9 +154,9 @@ export default function Dashboard() {
             })}
           </div>
 
-          {/* Search & Filter */}
-          <div className="flex gap-3 mb-4">
-            <div className="relative flex-1">
+          {/* Search, Filter & Date */}
+          <div className="flex gap-3 mb-4 flex-wrap">
+            <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
@@ -176,6 +180,7 @@ export default function Dashboard() {
                 <option value="paid">Paid</option>
               </select>
             </div>
+            <DateFilter value={dateRange} onChange={setDateRange} />
           </div>
 
           {/* Table */}
