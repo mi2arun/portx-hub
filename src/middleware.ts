@@ -18,6 +18,8 @@ export async function middleware(request: NextRequest) {
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
+    pathname === "/manifest.json" ||
+    pathname === "/sw.js" ||
     pathname.endsWith(".png") ||
     pathname.endsWith(".ico")
   ) {
