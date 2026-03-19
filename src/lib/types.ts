@@ -61,6 +61,39 @@ export type Invoice = {
   updated_at: string;
 };
 
+export const EXPENSE_CATEGORIES = [
+  "Cloud Services & Hosting",
+  "Software Subscriptions",
+  "Office Rent & Utilities",
+  "Internet & Telecom",
+  "Hardware & Equipment",
+  "Travel & Conveyance",
+  "Professional Fees",
+  "Office Supplies",
+  "Food & Beverages",
+  "Marketing & Advertising",
+  "Training & Courses",
+  "Salaries & Stipends",
+  "Insurance",
+  "Government Fees & Taxes",
+  "Miscellaneous",
+] as const;
+
+export type Expense = {
+  id: string;
+  date: string;
+  amount: number;
+  category: string;
+  vendor: string;
+  description: string;
+  payment_mode: string;
+  reference: string;
+  gst_amount: number;
+  vendor_gstin: string;
+  is_recurring: boolean;
+  created_at: string;
+};
+
 export type Payment = {
   id: string;
   invoice_id: string;

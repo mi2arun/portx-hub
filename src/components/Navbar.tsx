@@ -7,6 +7,7 @@ import Image from "next/image";
 import {
   FileText,
   Users,
+  Receipt,
   Settings,
   LogOut,
   Menu,
@@ -15,6 +16,7 @@ import {
 
 const links = [
   { href: "/", label: "Invoices", icon: FileText },
+  { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
