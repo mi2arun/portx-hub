@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import {
   LayoutDashboard,
@@ -16,20 +16,22 @@ import {
 } from "lucide-react";
 
 const links = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+function isLinkActive(href: string, pathname: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -43,7 +45,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/portx-logo.png" alt="Portx" width={90} height={29} priority />
+            <Image src="/portx-logo.png" alt="Portx" width={90} height={29} style={{ width: "auto", height: "auto" }} priority />
             <span className="font-semibold text-sm text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">Hub</span>
           </Link>
 
@@ -51,17 +53,13 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-1">
             {links.map((link) => {
               const Icon = link.icon;
-              const isActive = mounted
-                  ? (link as any).exact
-                    ? pathname === link.href
-                    : pathname === link.href || pathname.startsWith(link.href + "/")
-                  : false;
+              const active = isLinkActive(link.href, pathname);
               return (
                 <Link
                   key={link.href}
                   href={link.href}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium ${
-                    isActive
+                    active
                       ? "bg-violet-50 text-violet-700"
                       : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                   }`}
@@ -95,18 +93,14 @@ export default function Navbar() {
           <div className="md:hidden pb-3 border-t border-gray-100 mt-1 pt-2 space-y-1">
             {links.map((link) => {
               const Icon = link.icon;
-              const isActive = mounted
-                  ? (link as any).exact
-                    ? pathname === link.href
-                    : pathname === link.href || pathname.startsWith(link.href + "/")
-                  : false;
+              const active = isLinkActive(link.href, pathname);
               return (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setOpen(false)}
                   className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium ${
-                    isActive
+                    active
                       ? "bg-violet-50 text-violet-700"
                       : "text-gray-600 hover:bg-gray-50"
                   }`}
