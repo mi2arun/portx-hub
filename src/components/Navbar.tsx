@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   LayoutDashboard,
@@ -27,6 +27,9 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -48,9 +51,11 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-1">
             {links.map((link) => {
               const Icon = link.icon;
-              const isActive = (link as any).exact
-                  ? pathname === link.href
-                  : pathname === link.href || pathname.startsWith(link.href + "/");
+              const isActive = mounted
+                  ? (link as any).exact
+                    ? pathname === link.href
+                    : pathname === link.href || pathname.startsWith(link.href + "/")
+                  : false;
               return (
                 <Link
                   key={link.href}
@@ -90,9 +95,11 @@ export default function Navbar() {
           <div className="md:hidden pb-3 border-t border-gray-100 mt-1 pt-2 space-y-1">
             {links.map((link) => {
               const Icon = link.icon;
-              const isActive = (link as any).exact
-                  ? pathname === link.href
-                  : pathname === link.href || pathname.startsWith(link.href + "/");
+              const isActive = mounted
+                  ? (link as any).exact
+                    ? pathname === link.href
+                    : pathname === link.href || pathname.startsWith(link.href + "/")
+                  : false;
               return (
                 <Link
                   key={link.href}
