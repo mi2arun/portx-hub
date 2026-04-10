@@ -9,10 +9,12 @@ Invoicing and business management platform for Portx Infotech Private Limited.
 - **Framework:** Next.js 16 (App Router, `--webpack` mode)
 - **UI:** React 19, Tailwind CSS 4, Lucide icons
 - **Database:** Firebase Firestore (admin SDK server-side)
-- **Auth:** Firebase Auth (client) + JWT verification (middleware)
+- **Storage:** Firebase Storage (Blaze plan, documents upload)
+- **Auth:** Firebase Auth (client) + JWT verification (middleware) + password reset
 - **Tables:** TanStack Table v8
 - **PDF:** @react-pdf/renderer
 - **Email:** Nodemailer via company SMTP (panel.portx.in)
+- **PWA:** Service worker + manifest for installable app
 
 ## Project Structure
 
@@ -23,14 +25,16 @@ src/
 │   │   ├── auth/       # login, logout, setup
 │   │   ├── clients/    # CRUD + [id]
 │   │   ├── dashboard/  # aggregated metrics
+│   │   ├── documents/  # CRUD + [id]
 │   │   ├── expenses/   # CRUD + [id]
 │   │   ├── invoices/   # CRUD + [id]/payments + [id]/send-email
 │   │   └── settings/   # company settings GET/PUT
 │   ├── clients/        # clients page
+│   ├── documents/      # document management page
 │   ├── expenses/       # expenses page
 │   ├── invoices/       # list, [id] detail, [id]/edit, new
-│   ├── login/          # auth page
-│   ├── settings/       # company & SMTP settings
+│   ├── login/          # auth page with password reset
+│   ├── settings/       # company, bank, invoice numbering, SMTP settings
 │   └── page.tsx        # dashboard
 ├── components/         # shared UI components
 ├── lib/                # utilities, Firebase config, types
@@ -44,6 +48,14 @@ src/
 - `invoices` — invoice data with embedded items array, GST calculations
 - `payments` — linked to invoices, includes inr_amount for foreign currency
 - `expenses` — categorized expenses with GST input credit
+- `documents` — metadata for uploaded files (name, category, file_url, file_size, file_type)
+
+## Firebase Storage
+
+- Files stored under `documents/` path in Firebase Storage
+- Upload handled client-side via Firebase Storage SDK with progress tracking
+- Metadata (name, category, notes, URL) saved to Firestore `documents` collection
+- Categories: Company, Tax & GST, Contract, Client, Bank, Invoice, Other
 
 ## Multi-Currency Support
 
@@ -84,7 +96,8 @@ npx tsx scripts/migrate-invoices.ts  # import real invoices
 - All API routes return JSON via NextResponse
 - Client components use "use client" directive
 - Firestore admin SDK for all server-side data access
-- Firebase client SDK only for auth (login page)
+- Firebase client SDK for auth (login) and Storage (document uploads)
 - serviceAccountKey.json is gitignored — never commit
 - Invoice PDFs generated client-side via @react-pdf/renderer
 - Email sends PDF as base64 attachment via Nodemailer
+- PWA icons are square PNGs with white background (icon-192.png, icon-512.png)
