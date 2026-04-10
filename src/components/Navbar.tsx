@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   X,
+  FolderOpen,
 } from "lucide-react";
 
 const links = [
@@ -20,6 +21,7 @@ const links = [
   { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/clients", label: "Clients", icon: Users },
+  { href: "/documents", label: "Documents", icon: FolderOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
