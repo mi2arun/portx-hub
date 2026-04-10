@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { clientAuth } from "@/lib/firebase-client";
 import Image from "next/image";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -16,6 +16,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [isSetup, setIsSetup] = useState(false);
   const [checkingSetup, setCheckingSetup] = useState(true);
+  const [showReset, setShowReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSending, setResetSending] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetError, setResetError] = useState("");
 
   useEffect(() => {
     fetch("/api/auth/setup")
@@ -68,6 +73,25 @@ export default function LoginPage() {
       }
       setLoading(false);
     }
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setResetError("");
+    setResetSending(true);
+    try {
+      const email = resetEmail.includes("@") ? resetEmail : `${resetEmail}@portxhub.local`;
+      await sendPasswordResetEmail(clientAuth, email);
+      setResetSent(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      if (msg.includes("user-not-found")) {
+        setResetError("No account found with this email");
+      } else {
+        setResetError(msg);
+      }
+    }
+    setResetSending(false);
   }
 
   if (checkingSetup) {
@@ -151,7 +175,69 @@ export default function LoginPage() {
               {loading ? "Please wait..." : isSetup ? "Create Account" : "Sign In"}
             </button>
           </form>
+
+          {!isSetup && (
+            <div className="mt-4 text-center">
+              <button onClick={() => { setShowReset(true); setResetSent(false); setResetError(""); setResetEmail(""); }}
+                className="text-sm text-violet-600 hover:text-violet-800 hover:underline">
+                Forgot password?
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Password Reset Modal */}
+        {showReset && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+              {resetSent ? (
+                <div className="text-center py-4">
+                  <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-6 h-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">Reset Email Sent</h3>
+                  <p className="text-sm text-gray-500 mb-4">Check your inbox for the password reset link.</p>
+                  <button onClick={() => setShowReset(false)}
+                    className="px-5 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700">
+                    Back to Login
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">Reset Password</h3>
+                  <p className="text-sm text-gray-500 mb-4">Enter your email to receive a reset link.</p>
+                  {resetError && (
+                    <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-4 text-sm text-red-600">{resetError}</div>
+                  )}
+                  <form onSubmit={handleResetPassword} className="space-y-4">
+                    <input
+                      type="text"
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="Username or email"
+                      className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-violet-500 focus:border-violet-500 placeholder:text-gray-400"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <button type="submit" disabled={resetSending}
+                        className="flex-1 bg-violet-600 text-white py-2.5 rounded-lg hover:bg-violet-700 disabled:opacity-50 font-medium text-sm flex items-center justify-center gap-2">
+                        {resetSending && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {resetSending ? "Sending..." : "Send Reset Link"}
+                      </button>
+                      <button type="button" onClick={() => setShowReset(false)}
+                        className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
