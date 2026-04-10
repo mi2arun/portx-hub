@@ -14,7 +14,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json();
-  const { amount, payment_date, payment_mode, reference, notes } = body;
+  const { amount, inr_amount, payment_date, payment_mode, reference, notes } = body;
 
   if (!amount || amount <= 0) {
     return NextResponse.json({ error: "Amount must be greater than 0" }, { status: 400 });
@@ -38,7 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  const paymentData = {
+  const paymentData: Record<string, any> = {
     invoice_id: id,
     amount,
     payment_date: payment_date || new Date().toISOString().split("T")[0],
@@ -47,6 +47,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     notes: notes || "",
     created_at: new Date().toISOString(),
   };
+
+  // Store INR equivalent for foreign currency payments
+  if (inr_amount && inr_amount > 0) {
+    paymentData.inr_amount = inr_amount;
+  }
 
   const ref = await adminDb.collection("payments").add(paymentData);
 

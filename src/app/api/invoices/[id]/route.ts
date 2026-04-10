@@ -38,6 +38,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     client_country: clientData.country || "",
     client_gstin: clientData.gstin || "",
     client_pan: clientData.pan || "",
+    client_contact_name: clientData.contact_name || "",
+    client_email: clientData.email || "",
     client_is_international: clientData.is_international ? 1 : 0,
   };
 

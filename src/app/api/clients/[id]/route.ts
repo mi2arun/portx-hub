@@ -11,10 +11,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json();
-  const { name, address, state, country, gstin, pan, currency, is_international } = body;
+  const { name, contact_name, email, address, state, country, gstin, pan, currency, is_international } = body;
 
   const data = {
     name: name || "",
+    contact_name: contact_name || "",
+    email: email || "",
     address: address || "",
     state: state || "",
     country: country || "",

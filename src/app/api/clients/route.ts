@@ -9,10 +9,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { name, address, state, country, gstin, pan, currency, is_international } = body;
+  const { name, contact_name, email, address, state, country, gstin, pan, currency, is_international } = body;
 
   const data = {
     name: name || "",
+    contact_name: contact_name || "",
+    email: email || "",
     address: address || "",
     state: state || "",
     country: country || "",

@@ -8,6 +8,8 @@ import { Plus, Search, Users, X, Pencil, Trash2, Globe, MapPin } from "lucide-re
 type Client = {
   id: string;
   name: string;
+  contact_name: string;
+  email: string;
   address: string;
   state: string;
   country: string;
@@ -148,6 +150,7 @@ export default function ClientsPage() {
                     <tr key={client.id} className="hover:bg-gray-50/50">
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{client.name}</p>
+                        {client.contact_name && <p className="text-xs text-gray-500 mt-0.5">{client.contact_name}</p>}
                         {client.gstin && <p className="text-xs text-gray-400 mt-0.5">GSTIN: {client.gstin}</p>}
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">

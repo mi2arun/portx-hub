@@ -9,7 +9,7 @@ import PDFDownloadButton from "@/components/PDFDownloadButton";
 import { InvoiceSkeleton } from "@/components/Skeleton";
 import {
   ArrowLeft, Pencil, Send, Copy, Printer, Trash2,
-  CreditCard, Loader2, FileText, Trash,
+  CreditCard, Loader2, FileText, Trash, Mail, X, CheckCircle2,
 } from "lucide-react";
 
 type InvoiceData = {
@@ -32,12 +32,13 @@ type InvoiceData = {
     client_state: string;
     client_country: string;
     client_gstin: string;
+    client_email: string;
     client_is_international: number;
     amount_paid: number;
   };
   items: { id: string; description: string; quantity: number; rate: number; gst_rate: number; amount: number; }[];
   company: { name: string; address: string; gstin: string; pan: string; hsn_code: string; bank_name: string; account_name: string; account_number: string; ifsc: string; swift_code: string; email?: string; phone?: string; cin?: string; };
-  payments: { id: string; amount: number; payment_date: string; payment_mode: string; reference: string; notes: string; }[];
+  payments: { id: string; amount: number; inr_amount?: number; payment_date: string; payment_mode: string; reference: string; notes: string; }[];
 };
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
@@ -66,8 +67,15 @@ export default function ViewInvoicePage() {
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [payment, setPayment] = useState({
-    amount: 0, payment_date: new Date().toISOString().split("T")[0],
+    amount: 0, inr_amount: 0, payment_date: new Date().toISOString().split("T")[0],
     payment_mode: "bank_transfer", reference: "", notes: "",
+  });
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailForm, setEmailForm] = useState({
+    to: "", cc: "", subject: "", message: "",
   });
 
   function loadData() {
@@ -119,7 +127,7 @@ export default function ViewInvoicePage() {
     });
     if (!res.ok) { const err = await res.json(); setPaymentError(err.error || "Failed"); setPaymentSaving(false); return; }
     setPaymentSaving(false); setShowPaymentForm(false);
-    setPayment({ amount: 0, payment_date: new Date().toISOString().split("T")[0], payment_mode: "bank_transfer", reference: "", notes: "" });
+    setPayment({ amount: 0, inr_amount: 0, payment_date: new Date().toISOString().split("T")[0], payment_mode: "bank_transfer", reference: "", notes: "" });
     loadData();
   }
 
@@ -127,6 +135,75 @@ export default function ViewInvoicePage() {
     if (!confirm("Remove this payment record?")) return;
     await fetch(`/api/invoices/${id}/payments?paymentId=${paymentId}`, { method: "DELETE" });
     loadData();
+  }
+
+  function openEmailModal() {
+    setEmailForm({
+      to: data?.invoice.client_email || "",
+      cc: (data?.company as any).email || "",
+      subject: `Invoice ${data?.invoice.invoice_number} from ${data?.company.name}`,
+      message: "",
+    });
+    setEmailError("");
+    setEmailSent(false);
+    setShowEmailModal(true);
+  }
+
+  async function handleSendEmail() {
+    if (!emailForm.to) { setEmailError("Recipient email is required"); return; }
+    setEmailSending(true);
+    setEmailError("");
+
+    try {
+      // Generate PDF as base64
+      const { createElement } = await import("react");
+      const { pdf } = await import("@react-pdf/renderer");
+      const { default: InvoicePDF } = await import("@/components/InvoicePDF");
+
+      let logoBase64 = "";
+      try {
+        const logoRes = await fetch("/portx-logo.png");
+        const logoBlob = await logoRes.blob();
+        logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(logoBlob);
+        });
+      } catch {}
+
+      const doc = createElement(InvoicePDF, {
+        invoice: data!.invoice as any,
+        items: data!.items as any,
+        company: data!.company as any,
+        logoSrc: logoBase64,
+      });
+      const pdfBlob = await pdf(doc as any).toBlob();
+      const arrayBuffer = await pdfBlob.arrayBuffer();
+      const pdfBase64 = btoa(
+        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
+      );
+
+      const res = await fetch(`/api/invoices/${id}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...emailForm, pdfBase64 }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        setEmailError(err.error || "Failed to send email");
+        setEmailSending(false);
+        return;
+      }
+
+      setEmailSent(true);
+      setEmailSending(false);
+      loadData();
+      setTimeout(() => setShowEmailModal(false), 2000);
+    } catch (err: any) {
+      setEmailError(err.message || "Failed to send email");
+      setEmailSending(false);
+    }
   }
 
   if (loading) return <InvoiceSkeleton />;
@@ -183,6 +260,10 @@ export default function ViewInvoicePage() {
               <CreditCard className="w-3.5 h-3.5" /> Record Payment
             </button>
           )}
+          <button onClick={openEmailModal}
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+            <Mail className="w-3.5 h-3.5" /> Email
+          </button>
           <button onClick={handleClone} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
             <Copy className="w-3.5 h-3.5" /> Clone
           </button>
@@ -206,6 +287,8 @@ export default function ViewInvoicePage() {
             <p className="text-gray-500 text-sm">{invoice.invoice_number}</p>
           </div>
           <div className="sm:text-right">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/portx-logo.png" alt="Portx Infotech" className="h-10 mb-1 ml-auto" />
             <p className="text-lg font-bold text-gray-900">{company.name}</p>
             <p className="text-xs text-gray-500">GSTIN: {company.gstin}</p>
           </div>
@@ -336,14 +419,25 @@ export default function ViewInvoicePage() {
             <CreditCard className="w-4 h-4 text-emerald-500" /> Record Payment
           </h3>
           {paymentError && <div className="bg-red-50 border border-red-100 rounded-lg p-3 mb-4 text-sm text-red-600">{paymentError}</div>}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className={`grid grid-cols-1 ${cur !== "INR" ? "md:grid-cols-4" : "md:grid-cols-3"} gap-4 mb-4`}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Amount ({cur}) *</label>
               <input type="number" min="0.01" step="0.01" max={balance} value={payment.amount || ""}
                 onChange={(e) => setPayment((p) => ({ ...p, amount: Number(e.target.value) }))}
                 placeholder={`Max: ${balance.toFixed(2)}`} className={inputClass} />
               <p className="text-xs text-gray-400 mt-1">Balance: {formatCurrency(balance, cur)}</p>
             </div>
+            {cur !== "INR" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">INR Received *</label>
+                <input type="number" min="0" step="0.01" value={payment.inr_amount || ""}
+                  onChange={(e) => setPayment((p) => ({ ...p, inr_amount: Number(e.target.value) }))}
+                  placeholder="Actual INR received" className={inputClass} />
+                {payment.amount > 0 && payment.inr_amount > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">Rate: ₹{(payment.inr_amount / payment.amount).toFixed(2)}/{cur}</p>
+                )}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Date</label>
               <input type="date" value={payment.payment_date} onChange={(e) => setPayment((p) => ({ ...p, payment_date: e.target.value }))} className={inputClass} />
@@ -389,6 +483,7 @@ export default function ViewInvoicePage() {
               <tr className="border-b border-gray-100">
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                {cur !== "INR" && <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">INR Received</th>}
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Mode</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">Reference</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
@@ -399,6 +494,7 @@ export default function ViewInvoicePage() {
                 <tr key={p.id} className="hover:bg-gray-50/50">
                   <td className="px-4 py-2.5 text-gray-700">{p.payment_date}</td>
                   <td className="px-4 py-2.5 text-right font-medium text-emerald-600">{formatCurrency(p.amount, cur)}</td>
+                  {cur !== "INR" && <td className="px-4 py-2.5 text-right font-medium text-violet-600">{p.inr_amount ? formatCurrency(p.inr_amount, "INR") : "—"}</td>}
                   <td className="px-4 py-2.5 text-gray-500">{PAYMENT_MODES.find((m) => m.value === p.payment_mode)?.label || p.payment_mode}</td>
                   <td className="px-4 py-2.5 text-gray-400 hidden sm:table-cell">{p.reference || "—"}</td>
                   <td className="px-4 py-2.5 text-right">
@@ -413,10 +509,81 @@ export default function ViewInvoicePage() {
               <tr className="bg-gray-50/50 border-t border-gray-100">
                 <td className="px-4 py-2.5 font-medium text-gray-700">Total Paid</td>
                 <td className="px-4 py-2.5 text-right font-semibold text-emerald-600">{formatCurrency(invoice.amount_paid, cur)}</td>
+                {cur !== "INR" && (
+                  <td className="px-4 py-2.5 text-right font-semibold text-violet-600">
+                    {formatCurrency(data.payments.reduce((s, p) => s + (p.inr_amount || 0), 0), "INR")}
+                  </td>
+                )}
                 <td colSpan={3} />
               </tr>
             </tfoot>
           </table>
+          </div>
+        </div>
+      )}
+
+      {/* Email Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-blue-500" /> Send Invoice via Email
+              </h3>
+              <button onClick={() => setShowEmailModal(false)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {emailSent ? (
+                <div className="text-center py-8">
+                  <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+                  <p className="text-lg font-semibold text-gray-900">Email Sent!</p>
+                  <p className="text-sm text-gray-500 mt-1">Invoice {invoice.invoice_number} sent to {emailForm.to}</p>
+                </div>
+              ) : (
+                <>
+                  {emailError && <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-sm text-red-600">{emailError}</div>}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">To *</label>
+                    <input type="email" value={emailForm.to}
+                      onChange={(e) => setEmailForm((f) => ({ ...f, to: e.target.value }))}
+                      placeholder="client@example.com" className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">CC</label>
+                    <input type="email" value={emailForm.cc}
+                      onChange={(e) => setEmailForm((f) => ({ ...f, cc: e.target.value }))}
+                      placeholder="Optional" className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Subject</label>
+                    <input value={emailForm.subject}
+                      onChange={(e) => setEmailForm((f) => ({ ...f, subject: e.target.value }))}
+                      className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Message (optional)</label>
+                    <textarea value={emailForm.message} rows={3}
+                      onChange={(e) => setEmailForm((f) => ({ ...f, message: e.target.value }))}
+                      placeholder="Custom message (leave empty for default template)"
+                      className={inputClass} />
+                  </div>
+                  <p className="text-xs text-gray-400">Invoice PDF will be attached automatically.</p>
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={handleSendEmail} disabled={emailSending}
+                      className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                      {emailSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      {emailSending ? "Sending..." : "Send Email"}
+                    </button>
+                    <button onClick={() => setShowEmailModal(false)}
+                      className="px-5 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

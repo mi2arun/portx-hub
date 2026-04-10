@@ -7,6 +7,8 @@ import { Globe, Loader2 } from "lucide-react";
 type ClientData = {
   id?: string;
   name: string;
+  contact_name: string;
+  email: string;
   address: string;
   state: string;
   country: string;
@@ -27,7 +29,7 @@ export default function ClientForm({
 }) {
   const router = useRouter();
   const [form, setForm] = useState<ClientData>({
-    name: "", address: "", state: "", country: "India",
+    name: "", contact_name: "", email: "", address: "", state: "", country: "India",
     gstin: "", pan: "", currency: "INR", is_international: false,
   });
   const [saving, setSaving] = useState(false);
@@ -75,8 +77,19 @@ export default function ClientForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-xl">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Client Name *</label>
-        <input required value={form.name} onChange={(e) => update("name", e.target.value)} className={inputClass} placeholder="Company or individual name" />
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Company Name *</label>
+        <input required value={form.name} onChange={(e) => update("name", e.target.value)} className={inputClass} placeholder="Company name" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Contact Person</label>
+          <input value={form.contact_name} onChange={(e) => update("contact_name", e.target.value)} className={inputClass} placeholder="e.g., John Doe" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+          <input type="email" value={form.email} onChange={(e) => update("email", e.target.value)} className={inputClass} placeholder="billing@client.com" />
+        </div>
       </div>
 
       <div className="flex items-center gap-2.5">

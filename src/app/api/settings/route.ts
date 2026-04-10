@@ -36,6 +36,12 @@ export async function PUT(request: Request) {
     invoice_prefix: invoice_prefix || "A",
     invoice_next_number: invoice_next_number || 1,
     fy_start_month: fy_start_month || 4,
+    smtp_host: body.smtp_host || "",
+    smtp_port: body.smtp_port || 587,
+    smtp_user: body.smtp_user || "",
+    smtp_password: body.smtp_password || "",
+    smtp_from_email: body.smtp_from_email || "",
+    smtp_from_name: body.smtp_from_name || "",
   }, { merge: true });
 
   const doc = await adminDb.collection("company").doc("default").get();

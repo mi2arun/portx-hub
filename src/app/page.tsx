@@ -7,8 +7,16 @@ import { CardsSkeleton } from "@/components/Skeleton";
 import {
   TrendingUp, TrendingDown, Wallet, AlertTriangle,
   FileText, Receipt, ArrowRight, Users, CreditCard,
-  PieChart, BarChart3, Clock,
+  PieChart, BarChart3, Clock, Globe,
 } from "lucide-react";
+
+type CurrencyTotals = {
+  invoiced: number;
+  collected: number;
+  outstanding: number;
+  overdueAmount: number;
+  overdueCount: number;
+};
 
 type DashboardData = {
   totalInvoiced: number;
@@ -16,6 +24,8 @@ type DashboardData = {
   totalOutstanding: number;
   overdueAmount: number;
   overdueCount: number;
+  byCurrency: Record<string, CurrencyTotals>;
+  foreignInrReceived: number;
   totalExpenses: number;
   totalGstPaid: number;
   gstOutput: number;
@@ -23,7 +33,7 @@ type DashboardData = {
   profit: number;
   invoiceCount: number;
   statusCounts: Record<string, number>;
-  topClients: { name: string; total: number; paid: number }[];
+  topClients: { name: string; currency: string; total: number; paid: number }[];
   topExpenseCategories: { category: string; amount: number }[];
   recentInvoices: {
     id: string;
@@ -90,41 +100,98 @@ export default function DashboardPage() {
         <p className="text-sm text-gray-500 mt-0.5">Business overview and key metrics</p>
       </div>
 
-      {/* Top Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricCard
-          label="Total Invoiced"
-          value={formatCurrency(data.totalInvoiced, "INR")}
-          icon={FileText}
-          color="text-violet-600"
-          bg="bg-violet-50"
-        />
-        <MetricCard
-          label="Collected"
-          value={formatCurrency(data.totalCollected, "INR")}
-          icon={CreditCard}
-          color="text-emerald-600"
-          bg="bg-emerald-50"
-        />
-        <MetricCard
-          label="Outstanding"
-          value={formatCurrency(data.totalOutstanding, "INR")}
-          icon={Clock}
-          color="text-blue-600"
-          bg="bg-blue-50"
-          sub={data.overdueCount > 0 ? `${data.overdueCount} overdue` : undefined}
-          subColor="text-red-500"
-        />
-        <MetricCard
-          label="Expenses"
-          value={formatCurrency(data.totalExpenses, "INR")}
-          icon={Receipt}
-          color="text-red-500"
-          bg="bg-red-50"
-        />
-      </div>
+      {/* Top Metrics — per currency */}
+      {Object.entries(data.byCurrency).map(([cur, totals]) => (
+        <div key={cur}>
+          {Object.keys(data.byCurrency).length > 1 && (
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{cur} Revenue</h2>
+          )}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <MetricCard
+              label="Total Invoiced"
+              value={formatCurrency(totals.invoiced, cur)}
+              icon={FileText}
+              color="text-violet-600"
+              bg="bg-violet-50"
+            />
+            <MetricCard
+              label="Collected"
+              value={formatCurrency(totals.collected, cur)}
+              icon={CreditCard}
+              color="text-emerald-600"
+              bg="bg-emerald-50"
+            />
+            <MetricCard
+              label="Outstanding"
+              value={formatCurrency(totals.outstanding, cur)}
+              icon={Clock}
+              color="text-blue-600"
+              bg="bg-blue-50"
+              sub={totals.overdueCount > 0 ? `${totals.overdueCount} overdue` : undefined}
+              subColor="text-red-500"
+            />
+            {cur === "INR" ? (
+              <MetricCard
+                label="Expenses"
+                value={formatCurrency(data.totalExpenses, "INR")}
+                icon={Receipt}
+                color="text-red-500"
+                bg="bg-red-50"
+              />
+            ) : (
+              <MetricCard
+                label="Invoices"
+                value={`${Object.keys(data.byCurrency).length > 1 ? "" : ""}${data.invoiceCount}`}
+                icon={FileText}
+                color="text-gray-500"
+                bg="bg-gray-50"
+              />
+            )}
+          </div>
+        </div>
+      ))}
 
-      {/* Profit + GST row */}
+      {/* Expenses card if no INR invoices */}
+      {!data.byCurrency["INR"] && data.totalExpenses > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <MetricCard
+            label="Expenses"
+            value={formatCurrency(data.totalExpenses, "INR")}
+            icon={Receipt}
+            color="text-red-500"
+            bg="bg-red-50"
+          />
+        </div>
+      )}
+
+      {/* Total INR Revenue + Profit + GST row */}
+      {data.foreignInrReceived > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div className="bg-white rounded-xl border border-violet-100 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm text-gray-500">Total INR Revenue</span>
+              <Wallet className="w-4 h-4 text-violet-500" />
+            </div>
+            <p className="text-xl font-bold text-violet-700">
+              {formatCurrency((data.byCurrency["INR"]?.collected || 0) + data.foreignInrReceived, "INR")}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              INR {formatCurrency(data.byCurrency["INR"]?.collected || 0, "INR")} + Foreign {formatCurrency(data.foreignInrReceived, "INR")}
+            </p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm text-gray-500">Foreign INR Received</span>
+              <Globe className="w-4 h-4 text-blue-500" />
+            </div>
+            <p className="text-xl font-bold text-blue-600">
+              {formatCurrency(data.foreignInrReceived, "INR")}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">INR received for USD/other currency invoices</p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-1">
@@ -136,7 +203,7 @@ export default function DashboardPage() {
           <p className={`text-xl font-bold ${data.profit >= 0 ? "text-emerald-600" : "text-red-600"}`}>
             {formatCurrency(Math.abs(data.profit), "INR")}
           </p>
-          <p className="text-xs text-gray-400 mt-1">Collected minus expenses</p>
+          <p className="text-xs text-gray-400 mt-1">All INR collected minus expenses</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-1">
@@ -181,10 +248,10 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-900">{client.name}</p>
                     <p className="text-xs text-gray-400">
-                      Collected: {formatCurrency(client.paid, "INR")}
+                      Collected: {formatCurrency(client.paid, client.currency || "INR")}
                     </p>
                   </div>
-                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(client.total, "INR")}</p>
+                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(client.total, client.currency || "INR")}</p>
                 </div>
               ))
             )}

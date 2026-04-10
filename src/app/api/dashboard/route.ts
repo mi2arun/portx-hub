@@ -12,30 +12,52 @@ export async function GET() {
   const expenses = expensesSnap.docs.map((d) => d.data());
   const payments = paymentsSnap.docs.map((d) => d.data());
 
-  // Revenue
-  const totalInvoiced = invoices.reduce((s, i) => s + (i.total || 0), 0);
-  const totalCollected = invoices.reduce((s, i) => s + (i.amount_paid || 0), 0);
-  const totalOutstanding = totalInvoiced - totalCollected;
-
-  // Overdue
+  // Group by currency
+  const currencies = [...new Set(invoices.map((i) => i.currency || "INR"))];
+  const byCurrency: Record<string, { invoiced: number; collected: number; outstanding: number; overdueAmount: number; overdueCount: number }> = {};
   const today = new Date().toISOString().split("T")[0];
+
+  for (const cur of currencies) {
+    const curInvoices = invoices.filter((i) => (i.currency || "INR") === cur);
+    const invoiced = curInvoices.reduce((s, i) => s + (i.total || 0), 0);
+    const collected = curInvoices.reduce((s, i) => s + (i.amount_paid || 0), 0);
+    const overdue = curInvoices.filter(
+      (i) => (i.status === "sent" || i.status === "partially_paid") && i.due_date < today
+    );
+    byCurrency[cur] = {
+      invoiced,
+      collected,
+      outstanding: invoiced - collected,
+      overdueAmount: overdue.reduce((s, i) => s + (i.total || 0) - (i.amount_paid || 0), 0),
+      overdueCount: overdue.length,
+    };
+  }
+
+  // INR totals (for backward compat + expenses are always INR)
+  const inr = byCurrency["INR"] || { invoiced: 0, collected: 0, outstanding: 0, overdueAmount: 0, overdueCount: 0 };
+  const totalInvoiced = inr.invoiced;
+  const totalCollected = inr.collected;
+  const totalOutstanding = inr.outstanding;
+  const overdueAmount = inr.overdueAmount;
+
+  // Overdue count across all currencies
   const overdueInvoices = invoices.filter(
     (i) => (i.status === "sent" || i.status === "partially_paid") && i.due_date < today
   );
-  const overdueAmount = overdueInvoices.reduce(
-    (s, i) => s + (i.total || 0) - (i.amount_paid || 0), 0
-  );
 
-  // Expenses
+  // Expenses (always INR)
   const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0);
   const totalGstPaid = expenses.reduce((s, e) => s + (e.gst_amount || 0), 0);
 
-  // GST
+  // GST (only from INR invoices — international invoices have 0% GST)
   const gstOutput = invoices.reduce((s, i) => s + (i.cgst || 0) + (i.sgst || 0) + (i.igst || 0), 0);
   const gstNet = gstOutput - totalGstPaid;
 
-  // Profit (cash basis)
-  const profit = totalCollected - totalExpenses;
+  // INR received from foreign currency payments
+  const foreignInrReceived = payments.reduce((s, p) => s + (p.inr_amount || 0), 0);
+
+  // Profit (cash basis, INR collected + foreign INR received - expenses)
+  const profit = totalCollected + foreignInrReceived - totalExpenses;
 
   // Invoice status counts
   const statusCounts: Record<string, number> = {};
@@ -57,13 +79,15 @@ export async function GET() {
     }
   });
 
-  // Top clients by revenue
-  const clientRevenue: Record<string, { name: string; total: number; paid: number }> = {};
+  // Top clients by revenue (grouped by currency)
+  const clientRevenue: Record<string, { name: string; currency: string; total: number; paid: number }> = {};
   invoices.forEach((i) => {
     const name = i.client_name || "Unknown";
-    if (!clientRevenue[name]) clientRevenue[name] = { name, total: 0, paid: 0 };
-    clientRevenue[name].total += i.total || 0;
-    clientRevenue[name].paid += i.amount_paid || 0;
+    const cur = i.currency || "INR";
+    const key = `${name}__${cur}`;
+    if (!clientRevenue[key]) clientRevenue[key] = { name, currency: cur, total: 0, paid: 0 };
+    clientRevenue[key].total += i.total || 0;
+    clientRevenue[key].paid += i.amount_paid || 0;
   });
   const topClients = Object.values(clientRevenue).sort((a, b) => b.total - a.total).slice(0, 5);
 
@@ -89,6 +113,8 @@ export async function GET() {
     totalOutstanding,
     overdueAmount,
     overdueCount: overdueInvoices.length,
+    byCurrency,
+    foreignInrReceived,
     totalExpenses,
     totalGstPaid,
     gstOutput,

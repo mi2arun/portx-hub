@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Landmark, Hash, Loader2, Check, CalendarDays } from "lucide-react";
+import { Building2, Landmark, Hash, Loader2, Check, CalendarDays, Mail } from "lucide-react";
 
 type Company = {
   name: string;
@@ -22,6 +22,12 @@ type Company = {
   invoice_prefix: string;
   invoice_next_number: number;
   fy_start_month: number; // 4 = April (Indian FY)
+  smtp_host: string;
+  smtp_port: number;
+  smtp_user: string;
+  smtp_password: string;
+  smtp_from_email: string;
+  smtp_from_name: string;
 };
 
 export default function SettingsPage() {
@@ -30,6 +36,8 @@ export default function SettingsPage() {
     bank_name: "", account_name: "", account_number: "", ifsc: "", swift_code: "",
     email: "", phone: "", cin: "",
     invoice_prefix: "A", invoice_next_number: 1, fy_start_month: 4,
+    smtp_host: "", smtp_port: 587, smtp_user: "", smtp_password: "",
+    smtp_from_email: "", smtp_from_name: "",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -227,6 +235,46 @@ export default function SettingsPage() {
                   const endMonth = m === 1 ? 12 : m - 1;
                   return <>Current FY: <span className="font-semibold text-violet-700">{months[m-1]} {year} — {months[endMonth-1]} {endYear}</span></>;
                 })()}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SMTP / Email Settings */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+            <Mail className="w-4 h-4 text-violet-500" />
+            <h2 className="text-sm font-semibold text-gray-900">Email / SMTP Settings</h2>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>SMTP Host</label>
+                <input value={form.smtp_host} onChange={(e) => update("smtp_host", e.target.value)} className={inputClass} placeholder="e.g., panel.portx.in" />
+              </div>
+              <div>
+                <label className={labelClass}>SMTP Port</label>
+                <input type="number" value={form.smtp_port} onChange={(e) => update("smtp_port", Number(e.target.value))} className={inputClass} placeholder="587" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>SMTP Username</label>
+                <input value={form.smtp_user} onChange={(e) => update("smtp_user", e.target.value)} className={inputClass} placeholder="e.g., noreply@portx.in" />
+              </div>
+              <div>
+                <label className={labelClass}>SMTP Password</label>
+                <input type="password" value={form.smtp_password} onChange={(e) => update("smtp_password", e.target.value)} className={inputClass} placeholder="••••••••" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>From Email</label>
+                <input type="email" value={form.smtp_from_email} onChange={(e) => update("smtp_from_email", e.target.value)} className={inputClass} placeholder="e.g., noreply@portx.in" />
+              </div>
+              <div>
+                <label className={labelClass}>From Name</label>
+                <input value={form.smtp_from_name} onChange={(e) => update("smtp_from_name", e.target.value)} className={inputClass} placeholder="e.g., Portx Infotech" />
               </div>
             </div>
           </div>

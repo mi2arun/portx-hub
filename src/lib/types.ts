@@ -23,6 +23,8 @@ export type Company = {
 export type Client = {
   id: string;
   name: string;
+  contact_name: string;
+  email: string;
   address: string;
   state: string;
   country: string;
@@ -98,6 +100,7 @@ export type Payment = {
   id: string;
   invoice_id: string;
   amount: number;
+  inr_amount?: number;
   payment_date: string;
   payment_mode: string;
   reference: string;
