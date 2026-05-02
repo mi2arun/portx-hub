@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireActiveCompanyId } from "@/lib/auth";
 import nodemailer from "nodemailer";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const companyId = await requireActiveCompanyId();
   const { id } = await params;
   const body = await req.json();
   const { to, cc, subject, message, pdfBase64 } = body;
@@ -11,8 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Recipient email is required" }, { status: 400 });
   }
 
-  // Fetch SMTP settings from company doc
-  const companyDoc = await adminDb.collection("company").doc("default").get();
+  const companyDoc = await adminDb.collection("companies").doc(companyId).get();
   if (!companyDoc.exists) {
     return NextResponse.json({ error: "Company settings not configured" }, { status: 400 });
   }
@@ -22,9 +23,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "SMTP settings not configured. Go to Settings to set up email." }, { status: 400 });
   }
 
-  // Fetch invoice and client
   const invoiceDoc = await adminDb.collection("invoices").doc(id).get();
-  if (!invoiceDoc.exists) {
+  if (!invoiceDoc.exists || invoiceDoc.data()?.company_id !== companyId) {
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
   const invoice = invoiceDoc.data()!;
@@ -70,7 +70,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     await transporter.sendMail(mailOptions);
 
-    // Update invoice status to sent if currently draft
     if (invoice.status === "draft") {
       await adminDb.collection("invoices").doc(id).update({
         status: "sent",

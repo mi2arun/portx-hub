@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireActiveCompanyId } from "@/lib/auth";
 
 export async function GET() {
+  const companyId = await requireActiveCompanyId();
   const snapshot = await adminDb.collection("documents")
-    .orderBy("uploaded_at", "desc").get();
-  const documents = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    .where("company_id", "==", companyId).get();
+  const documents = snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }))
+    .sort((a: any, b: any) => (b.uploaded_at || "").localeCompare(a.uploaded_at || ""));
   return NextResponse.json(documents);
 }
 
 export async function POST(request: Request) {
+  const companyId = await requireActiveCompanyId();
   const body = await request.json();
   const { name, category, file_name, file_url, file_size, file_type, notes, client_id } = body;
 
@@ -17,6 +22,7 @@ export async function POST(request: Request) {
   }
 
   const data = {
+    company_id: companyId,
     name: name || "",
     category: category || "Other",
     file_name: file_name || "",

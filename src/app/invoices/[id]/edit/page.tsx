@@ -20,8 +20,7 @@ export default function EditInvoicePage() {
       .then((r) => { if (!r.ok) throw new Error("Not found"); return r.json(); })
       .then((d) => {
         if (!d.invoice) throw new Error("Not found");
-        if (d.invoice.status !== "draft") setError(true);
-        else setData(d);
+        setData(d);
         setLoading(false);
       })
       .catch(() => { setError(true); setLoading(false); });
@@ -72,6 +71,10 @@ export default function EditInvoicePage() {
             due_date: data.invoice.due_date as string,
             status: data.invoice.status as string,
             items: data.items,
+            place_of_supply: (data.invoice.place_of_supply as string) || "",
+            export_type: ((data.invoice.export_type as string) || "") as "lut" | "with_tax" | "",
+            notes: (data.invoice.notes as string) || "",
+            po_reference: (data.invoice.po_reference as string) || "",
           }}
         />
       </div>

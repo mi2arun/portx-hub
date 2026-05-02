@@ -1,35 +1,77 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { getNextInvoiceNumber } from "@/lib/invoice-number";
-import { getGstType, calculateItemTotals } from "@/lib/gst";
+import { getGstType, calculateItemTotals, type ExportType } from "@/lib/gst";
+import { requireActiveCompanyId } from "@/lib/auth";
 
 export async function GET() {
+  const companyId = await requireActiveCompanyId();
   const snapshot = await adminDb.collection("invoices")
-    .orderBy("created_at", "desc").get();
-  const invoices = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    .where("company_id", "==", companyId).get();
+  const invoices = snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }))
+    .sort((a: any, b: any) => (b.created_at || "").localeCompare(a.created_at || ""));
   return NextResponse.json(invoices);
 }
 
 export async function POST(request: Request) {
+  const companyId = await requireActiveCompanyId();
   const body = await request.json();
-  const { client_id, invoice_date, due_date, items, status } = body;
+  const {
+    client_id,
+    invoice_date,
+    due_date,
+    items,
+    status,
+    place_of_supply: placeOfSupplyOverride,
+    export_type: exportTypeRaw,
+    notes,
+    po_reference,
+  } = body;
 
-  // Fetch client
   const clientDoc = await adminDb.collection("clients").doc(client_id).get();
-  if (!clientDoc.exists) {
+  if (!clientDoc.exists || clientDoc.data()?.company_id !== companyId) {
     return NextResponse.json({ error: "Client not found" }, { status: 400 });
   }
   const client = clientDoc.data()!;
 
-  // Fetch company
-  const companyDoc = await adminDb.collection("company").doc("default").get();
+  const companyDoc = await adminDb.collection("companies").doc(companyId).get();
+  if (!companyDoc.exists) {
+    return NextResponse.json({ error: "Company not found" }, { status: 400 });
+  }
   const company = companyDoc.data()!;
 
-  const invoiceNumber = await getNextInvoiceNumber();
-  const gstType = getGstType(!!client.is_international, client.state, company.state);
+  // Resolve export classification — only meaningful for international clients.
+  const isInternational = !!client.is_international;
+  let exportType: ExportType = "";
+  if (isInternational) {
+    if (exportTypeRaw === "lut" || exportTypeRaw === "with_tax") {
+      exportType = exportTypeRaw;
+    } else {
+      // Sensible default: LUT if company has it set up, otherwise with-tax.
+      exportType = company.lut_enabled ? "lut" : "with_tax";
+    }
+  }
+
+  // Validate LUT prerequisites
+  if (exportType === "lut" && !company.lut_enabled) {
+    return NextResponse.json({ error: "LUT is not enabled on this company. Enable it in Settings → LUT." }, { status: 400 });
+  }
+  if (exportType === "lut" && !company.lut_arn) {
+    return NextResponse.json({ error: "LUT ARN is required. Set it in Settings → LUT." }, { status: 400 });
+  }
+
+  // Place of supply: explicit override > client country (export) > client state (domestic)
+  const place_of_supply =
+    (typeof placeOfSupplyOverride === "string" && placeOfSupplyOverride.trim()) ||
+    (isInternational ? client.country || "" : client.state || "");
+
+  const invoiceNumber = await getNextInvoiceNumber(companyId);
+  const gstType = getGstType(isInternational, client.state, company.state, exportType);
   const totals = calculateItemTotals(items, gstType);
 
   const invoiceData = {
+    company_id: companyId,
     invoice_number: invoiceNumber,
     invoice_date,
     due_date,
@@ -48,9 +90,15 @@ export async function POST(request: Request) {
       description: item.description,
       quantity: item.quantity,
       rate: item.rate,
-      gst_rate: item.gst_rate,
+      // Force 0% rate when no tax is being charged so the line items don't lie
+      gst_rate: gstType === "none" ? 0 : item.gst_rate,
       amount: item.quantity * item.rate,
     })),
+    place_of_supply,
+    export_type: exportType,
+    lut_arn: exportType === "lut" ? (company.lut_arn || "") : "",
+    notes: typeof notes === "string" ? notes : "",
+    po_reference: typeof po_reference === "string" ? po_reference : "",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };

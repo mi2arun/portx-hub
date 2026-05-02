@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireActiveCompanyId } from "@/lib/auth";
 
 export async function GET(request: Request) {
+  const companyId = await requireActiveCompanyId();
   const url = new URL(request.url);
   const category = url.searchParams.get("category");
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
 
-  let query: FirebaseFirestore.Query = adminDb.collection("expenses");
+  let query: FirebaseFirestore.Query = adminDb.collection("expenses")
+    .where("company_id", "==", companyId);
 
   if (category && category !== "all") {
     query = query.where("category", "==", category);
@@ -16,7 +19,6 @@ export async function GET(request: Request) {
   const snapshot = await query.get();
   let expenses = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
-  // Client-side date filtering (avoids composite index)
   if (from) {
     expenses = expenses.filter((e: any) => e.date >= from);
   }
@@ -24,13 +26,13 @@ export async function GET(request: Request) {
     expenses = expenses.filter((e: any) => e.date <= to);
   }
 
-  // Sort by date descending
   expenses.sort((a: any, b: any) => (b.date || "").localeCompare(a.date || ""));
 
   return NextResponse.json(expenses);
 }
 
 export async function POST(request: Request) {
+  const companyId = await requireActiveCompanyId();
   const body = await request.json();
   const {
     date, amount, category, vendor, description,
@@ -48,6 +50,7 @@ export async function POST(request: Request) {
   }
 
   const data = {
+    company_id: companyId,
     date,
     amount: Number(amount),
     category: category || "",

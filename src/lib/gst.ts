@@ -1,11 +1,25 @@
 export type GstType = "igst" | "cgst_sgst" | "none";
+export type ExportType = "lut" | "with_tax" | "";
 
+/**
+ * Resolve which GST type applies on an invoice.
+ *
+ *  Domestic intra-state → CGST + SGST
+ *  Domestic inter-state → IGST
+ *  Export under LUT     → none (zero-rated without payment, mention LUT)
+ *  Export with payment  → IGST (zero-rated with payment, refundable)
+ */
 export function getGstType(
   isInternational: boolean,
   clientState: string,
-  companyState: string
+  companyState: string,
+  exportType: ExportType = ""
 ): GstType {
-  if (isInternational) return "none";
+  if (isInternational) {
+    if (exportType === "with_tax") return "igst";
+    // default for export = LUT (no tax). Caller should ensure LUT is configured.
+    return "none";
+  }
   if (clientState.toLowerCase() === companyState.toLowerCase()) return "cgst_sgst";
   return "igst";
 }

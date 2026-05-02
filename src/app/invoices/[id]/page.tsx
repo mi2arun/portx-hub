@@ -35,9 +35,14 @@ type InvoiceData = {
     client_email: string;
     client_is_international: number;
     amount_paid: number;
+    place_of_supply?: string;
+    export_type?: "lut" | "with_tax" | "";
+    lut_arn?: string;
+    notes?: string;
+    po_reference?: string;
   };
   items: { id: string; description: string; quantity: number; rate: number; gst_rate: number; amount: number; }[];
-  company: { name: string; address: string; gstin: string; pan: string; hsn_code: string; bank_name: string; account_name: string; account_number: string; ifsc: string; swift_code: string; email?: string; phone?: string; cin?: string; };
+  company: { name: string; address: string; gstin: string; pan: string; hsn_code: string; bank_name?: string; account_name?: string; account_number?: string; ifsc?: string; swift_code?: string; bank_accounts?: { id: string; label: string; currency: string; beneficiary_bank: string; beneficiary_account_name: string; beneficiary_account_number: string; ifsc: string; swift_code: string; is_primary: boolean; }[]; email?: string; phone?: string; cin?: string; logo_path?: string; lut_enabled?: boolean; lut_arn?: string; lut_note?: string; };
   payments: { id: string; amount: number; inr_amount?: number; payment_date: string; payment_mode: string; reference: string; notes: string; }[];
 };
 
@@ -162,7 +167,8 @@ export default function ViewInvoicePage() {
 
       let logoBase64 = "";
       try {
-        const logoRes = await fetch("/portx-logo.png");
+        const logoSrc = (data!.company as { logo_path?: string }).logo_path || "/portx-logo.png";
+        const logoRes = await fetch(logoSrc);
         const logoBlob = await logoRes.blob();
         logoBase64 = await new Promise<string>((resolve) => {
           const reader = new FileReader();
@@ -242,17 +248,15 @@ export default function ViewInvoicePage() {
           <p className="text-sm text-gray-500 mt-0.5">{invoice.client_name} &middot; {invoice.invoice_date}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Link href={`/invoices/${invoice.id}/edit`}
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+            <Pencil className="w-3.5 h-3.5" /> Edit
+          </Link>
           {invoice.status === "draft" && (
-            <>
-              <Link href={`/invoices/${invoice.id}/edit`}
-                className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
-                <Pencil className="w-3.5 h-3.5" /> Edit
-              </Link>
-              <button onClick={() => updateStatus("sent")} disabled={updating}
-                className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                {updating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Mark Sent
-              </button>
-            </>
+            <button onClick={() => updateStatus("sent")} disabled={updating}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              {updating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />} Mark Sent
+            </button>
           )}
           {(invoice.status === "sent" || invoice.status === "partially_paid") && (
             <button onClick={() => setShowPaymentForm(!showPaymentForm)}
@@ -288,16 +292,22 @@ export default function ViewInvoicePage() {
           </div>
           <div className="sm:text-right">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/portx-logo.png" alt="Portx Infotech" className="h-10 mb-1 ml-auto" />
+            <img src={company.logo_path || "/portx-logo.png"} alt={company.name || "Logo"} className="h-10 mb-1 ml-auto" />
             <p className="text-lg font-bold text-gray-900">{company.name}</p>
             <p className="text-xs text-gray-500">GSTIN: {company.gstin}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6 text-sm">
           <div><span className="text-gray-400 text-xs uppercase">Invoice Date</span><p className="font-medium">{invoice.invoice_date}</p></div>
           <div><span className="text-gray-400 text-xs uppercase">Due Date</span><p className="font-medium">{invoice.due_date}</p></div>
-          <div><span className="text-gray-400 text-xs uppercase">HSN/SAC Code</span><p className="font-medium">{invoice.hsn_code || company.hsn_code}</p></div>
+          <div><span className="text-gray-400 text-xs uppercase">HSN/SAC Code</span><p className="font-medium">{invoice.hsn_code || company.hsn_code || "—"}</p></div>
+          {invoice.place_of_supply && (
+            <div><span className="text-gray-400 text-xs uppercase">Place of Supply</span><p className="font-medium">{invoice.place_of_supply}</p></div>
+          )}
+          {invoice.po_reference && (
+            <div><span className="text-gray-400 text-xs uppercase">PO Reference</span><p className="font-medium">{invoice.po_reference}</p></div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mb-8">
@@ -365,14 +375,63 @@ export default function ViewInvoicePage() {
           <span className="font-medium text-gray-800">{numberToWords(invoice.total, cur)}</span>
         </div>
 
+        {/* LUT / Export note */}
+        {invoice.export_type === "lut" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6 text-xs">
+            <div className="font-semibold text-amber-900 uppercase tracking-wide">
+              {company.lut_note || "EXPORT OF SERVICES WITHOUT PAYMENT OF TAX UNDER LUT"}
+            </div>
+            {invoice.lut_arn && (
+              <div className="text-amber-800 mt-1 font-mono">ARN : {invoice.lut_arn}</div>
+            )}
+          </div>
+        )}
+
+        {invoice.notes && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-6 text-xs">
+            <div className="font-semibold text-gray-600 uppercase tracking-wide mb-1">Additional Notes</div>
+            <div className="text-gray-700 whitespace-pre-wrap">{invoice.notes}</div>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row justify-between gap-6 sm:gap-8">
           <div className="text-sm space-y-1">
             <h3 className="text-xs font-semibold text-violet-600 uppercase mb-2 tracking-wider">Bank Details</h3>
-            <p className="text-gray-600"><span className="text-gray-400">Bank:</span> {company.bank_name}</p>
-            <p className="text-gray-600"><span className="text-gray-400">Account:</span> {company.account_name}</p>
-            <p className="text-gray-600"><span className="text-gray-400">A/C No:</span> {company.account_number}</p>
-            <p className="text-gray-600"><span className="text-gray-400">IFSC:</span> {company.ifsc}</p>
-            <p className="text-gray-600"><span className="text-gray-400">SWIFT:</span> {company.swift_code}</p>
+            {(() => {
+              const accs = company.bank_accounts || [];
+              const c = (cur || "").toUpperCase();
+              const acc =
+                accs.find((a) => (a.currency || "").toUpperCase() === c) ||
+                accs.find((a) => a.is_primary) ||
+                accs.find((a) => !a.currency) ||
+                accs[0];
+              const bank = acc?.beneficiary_bank ?? company.bank_name ?? "";
+              const acctName = acc?.beneficiary_account_name ?? company.account_name ?? "";
+              const acctNo = acc?.beneficiary_account_number ?? company.account_number ?? "";
+              const ifsc = acc?.ifsc ?? company.ifsc ?? "";
+              const swift = acc?.swift_code ?? company.swift_code ?? "";
+              const isExport = !!invoice.client_is_international;
+              const rows: { label: string; value: string }[] = [
+                { label: "Beneficiary Bank", value: bank },
+                { label: "Beneficiary Account Name", value: acctName },
+                { label: "Beneficiary Account No.", value: acctNo },
+              ];
+              if (!isExport && ifsc) rows.push({ label: "IFSC", value: ifsc });
+              if (swift) rows.push({ label: "SWIFT", value: swift });
+              return (
+                <div
+                  className="grid gap-x-6 gap-y-1 text-gray-600"
+                  style={{ gridTemplateColumns: "max-content 1fr" }}
+                >
+                  {rows.map((r) => (
+                    <div key={r.label} className="contents">
+                      <span className="text-gray-400 whitespace-nowrap">{r.label}</span>
+                      <span className="break-words">{r.value}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
           <div className="w-full sm:w-72 bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{formatCurrency(invoice.subtotal, cur)}</span></div>

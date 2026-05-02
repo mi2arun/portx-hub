@@ -10,9 +10,10 @@ type PDFDownloadButtonProps = {
   fileName: string;
 };
 
-async function loadLogoBase64(): Promise<string> {
+async function loadLogoBase64(src: string): Promise<string> {
+  if (!src) return "";
   try {
-    const res = await fetch("/portx-logo.png");
+    const res = await fetch(src);
     const blob = await res.blob();
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -35,7 +36,8 @@ export default function PDFDownloadButton({
   async function handleDownload() {
     setGenerating(true);
     try {
-      const logoBase64 = await loadLogoBase64();
+      const logoSrc = (company as { logo_path?: string }).logo_path || "/portx-logo.png";
+      const logoBase64 = await loadLogoBase64(logoSrc);
       const { pdf } = await import("@react-pdf/renderer");
       const { default: InvoicePDF } = await import("@/components/InvoicePDF");
       const doc = createElement(InvoicePDF, {

@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { requireActiveCompanyId } from "@/lib/auth";
+
+async function getScopedInvoice(id: string, companyId: string) {
+  const doc = await adminDb.collection("invoices").doc(id).get();
+  if (!doc.exists) return null;
+  if (doc.data()?.company_id !== companyId) return null;
+  return doc;
+}
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const companyId = await requireActiveCompanyId();
   const { id } = await params;
+  const invoice = await getScopedInvoice(id, companyId);
+  if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+
   const snapshot = await adminDb.collection("payments")
     .where("invoice_id", "==", id).get();
   const payments = snapshot.docs
@@ -12,6 +24,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const companyId = await requireActiveCompanyId();
   const { id } = await params;
   const body = await req.json();
   const { amount, inr_amount, payment_date, payment_mode, reference, notes } = body;
@@ -20,10 +33,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Amount must be greater than 0" }, { status: 400 });
   }
 
-  const invoiceDoc = await adminDb.collection("invoices").doc(id).get();
-  if (!invoiceDoc.exists) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
-  }
+  const invoiceDoc = await getScopedInvoice(id, companyId);
+  if (!invoiceDoc) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
 
   const invoice = invoiceDoc.data()!;
   if (invoice.status === "draft") {
@@ -39,6 +50,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const paymentData: Record<string, any> = {
+    company_id: companyId,
     invoice_id: id,
     amount,
     payment_date: payment_date || new Date().toISOString().split("T")[0],
@@ -48,14 +60,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     created_at: new Date().toISOString(),
   };
 
-  // Store INR equivalent for foreign currency payments
   if (inr_amount && inr_amount > 0) {
     paymentData.inr_amount = inr_amount;
   }
 
   const ref = await adminDb.collection("payments").add(paymentData);
 
-  // Update invoice
   const newAmountPaid = Math.round(((invoice.amount_paid || 0) + amount) * 100) / 100;
   const newStatus = newAmountPaid >= invoice.total ? "paid" : "partially_paid";
 
@@ -69,6 +79,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const companyId = await requireActiveCompanyId();
   const { id } = await params;
   const url = new URL(req.url);
   const paymentId = url.searchParams.get("paymentId");
@@ -77,6 +88,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ error: "paymentId required" }, { status: 400 });
   }
 
+  const invoiceDoc = await getScopedInvoice(id, companyId);
+  if (!invoiceDoc) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+
   const paymentDoc = await adminDb.collection("payments").doc(paymentId).get();
   if (!paymentDoc.exists || paymentDoc.data()?.invoice_id !== id) {
     return NextResponse.json({ error: "Payment not found" }, { status: 404 });
@@ -84,12 +98,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
   await adminDb.collection("payments").doc(paymentId).delete();
 
-  // Recalculate amount_paid
   const remaining = await adminDb.collection("payments")
     .where("invoice_id", "==", id).get();
   const totalPaid = remaining.docs.reduce((sum, doc) => sum + (doc.data().amount || 0), 0);
 
-  const invoiceDoc = await adminDb.collection("invoices").doc(id).get();
   const invoiceTotal = invoiceDoc.data()?.total || 0;
   const newStatus = totalPaid <= 0 ? "sent" : totalPaid >= invoiceTotal ? "paid" : "partially_paid";
 

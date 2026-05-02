@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { jwtVerify, createRemoteJWKSet } from "jose";
 
 const COOKIE_NAME = "portx-session";
+const COMPANY_COOKIE = "portx-company";
 const PROJECT_ID = "portxhub";
 
 const JWKS = createRemoteJWKSet(
@@ -10,6 +11,9 @@ const JWKS = createRemoteJWKSet(
 );
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/setup", "/api/auth/logout"];
+
+// Paths that need a session but not an active company (so the user can pick one)
+const COMPANY_EXEMPT_PATHS = ["/select-company", "/api/companies", "/api/auth/logout"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -37,10 +41,26 @@ export async function middleware(request: NextRequest) {
       issuer: `https://securetoken.google.com/${PROJECT_ID}`,
       audience: PROJECT_ID,
     });
-    return NextResponse.next();
   } catch {
     return NextResponse.redirect(new URL("/login", request.url));
   }
+
+  const activeCompany = request.cookies.get(COMPANY_COOKIE)?.value;
+  const isExempt = COMPANY_EXEMPT_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
+
+  if (!activeCompany && !isExempt) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { error: "No active company selected" },
+        { status: 412 }
+      );
+    }
+    return NextResponse.redirect(new URL("/select-company", request.url));
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

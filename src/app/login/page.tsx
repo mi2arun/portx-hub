@@ -35,6 +35,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      let redirect = "/";
       if (isSetup) {
         const res = await fetch("/api/auth/setup", {
           method: "POST",
@@ -46,11 +47,13 @@ export default function LoginPage() {
         const email = data.email;
         const cred = await signInWithEmailAndPassword(clientAuth, email, password);
         const idToken = await cred.user.getIdToken();
-        await fetch("/api/auth/login", {
+        const loginRes = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ idToken }),
         });
+        const loginData = await loginRes.json().catch(() => ({}));
+        if (loginData.redirect) redirect = loginData.redirect;
       } else {
         const email = username.includes("@") ? username : `${username}@portxhub.local`;
         const cred = await signInWithEmailAndPassword(clientAuth, email, password);
@@ -61,8 +64,10 @@ export default function LoginPage() {
           body: JSON.stringify({ idToken }),
         });
         if (!res.ok) { setError("Login failed"); setLoading(false); return; }
+        const loginData = await res.json().catch(() => ({}));
+        if (loginData.redirect) redirect = loginData.redirect;
       }
-      router.push("/");
+      router.push(redirect);
       router.refresh();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Something went wrong";

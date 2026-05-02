@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import Image from "next/image";
 import {
@@ -15,6 +15,7 @@ import {
   X,
   FolderOpen,
 } from "lucide-react";
+import CompanySwitcher from "./CompanySwitcher";
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -32,24 +33,28 @@ function isLinkActive(href: string, pathname: string): boolean {
 
 export default function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+    // Hard navigate so any in-flight RSC requests / cached client state are dropped
+    window.location.href = "/login";
   }
 
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/portx-logo.png" alt="Portx" width={90} height={29} style={{ width: "auto", height: "auto" }} priority />
-            <span className="font-semibold text-sm text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">Hub</span>
-          </Link>
+          {/* Logo + active company */}
+          <div className="flex items-center gap-3 min-w-0">
+            <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+              <Image src="/portx-logo.png" alt="Portx" width={90} height={29} style={{ width: "auto", height: "auto" }} priority />
+              <span className="font-semibold text-sm text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded">Hub</span>
+            </Link>
+            <div className="hidden sm:block">
+              <CompanySwitcher />
+            </div>
+          </div>
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-1">
@@ -93,6 +98,9 @@ export default function Navbar() {
         {/* Mobile Nav */}
         {open && (
           <div className="md:hidden pb-3 border-t border-gray-100 mt-1 pt-2 space-y-1">
+            <div className="px-1 pb-2 sm:hidden">
+              <CompanySwitcher />
+            </div>
             {links.map((link) => {
               const Icon = link.icon;
               const active = isLinkActive(link.href, pathname);

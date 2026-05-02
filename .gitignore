@@ -5,6 +5,7 @@
 
 # firebase
 *-firebase-adminsdk-*.json
+serviceAccountKey.json
 .env.local
 
 # dependencies

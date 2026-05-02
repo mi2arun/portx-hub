@@ -1,17 +1,16 @@
 import { adminDb } from "./firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
 
-export async function getNextInvoiceNumber(): Promise<string> {
-  // Use a transaction to atomically read and increment the invoice number
+export async function getNextInvoiceNumber(companyId: string): Promise<string> {
   return adminDb.runTransaction(async (transaction) => {
-    const companyRef = adminDb.collection("company").doc("default");
+    const companyRef = adminDb.collection("companies").doc(companyId);
     const companyDoc = await transaction.get(companyRef);
 
     const prefix = companyDoc.data()?.invoice_prefix || "A";
     let nextNum = companyDoc.data()?.invoice_next_number || 1;
 
-    // Also check the last invoice to prevent duplicates
+    // Scope last-invoice lookup to this company so prefixes don't collide
     const lastInvoice = await adminDb.collection("invoices")
+      .where("company_id", "==", companyId)
       .orderBy("created_at", "desc").limit(1).get();
 
     if (!lastInvoice.empty) {
@@ -26,7 +25,6 @@ export async function getNextInvoiceNumber(): Promise<string> {
 
     const invoiceNumber = `${prefix}${String(nextNum).padStart(5, "0")}`;
 
-    // Update the next number
     transaction.update(companyRef, { invoice_next_number: nextNum + 1 });
 
     return invoiceNumber;

@@ -11,6 +11,7 @@ type Client = {
   currency: string;
   is_international: boolean;
   state: string;
+  country: string;
 };
 
 type LineItem = {
@@ -20,6 +21,8 @@ type LineItem = {
   gst_rate: number;
 };
 
+type ExportType = "lut" | "with_tax" | "";
+
 type InvoiceFormProps = {
   invoiceId?: string;
   initialData?: {
@@ -28,6 +31,10 @@ type InvoiceFormProps = {
     due_date: string;
     status: string;
     items: LineItem[];
+    place_of_supply?: string;
+    export_type?: ExportType;
+    notes?: string;
+    po_reference?: string;
   };
 };
 
@@ -35,7 +42,14 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [companyState, setCompanyState] = useState("");
+  const [companyLutEnabled, setCompanyLutEnabled] = useState(false);
+  const [companyLutArn, setCompanyLutArn] = useState("");
   const [clientId, setClientId] = useState<string>(initialData?.client_id || "");
+  const [placeOfSupply, setPlaceOfSupply] = useState<string>(initialData?.place_of_supply || "");
+  const [placeOfSupplyTouched, setPlaceOfSupplyTouched] = useState(!!initialData?.place_of_supply);
+  const [exportType, setExportType] = useState<ExportType>(initialData?.export_type || "");
+  const [notes, setNotes] = useState<string>(initialData?.notes || "");
+  const [poReference, setPoReference] = useState<string>(initialData?.po_reference || "");
   const [invoiceDate, setInvoiceDate] = useState(
     initialData?.invoice_date || new Date().toISOString().split("T")[0]
   );
@@ -61,6 +75,8 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
     loadClients();
     fetch("/api/settings").then((r) => r.json()).then((d) => {
       if (d?.state) setCompanyState(d.state);
+      setCompanyLutEnabled(!!d?.lut_enabled);
+      setCompanyLutArn(d?.lut_arn || "");
     }).catch(() => {});
   }, []);
 
@@ -85,8 +101,41 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
   const isInternational = selectedClient?.is_international;
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.rate, 0);
 
+  // Auto-fill place_of_supply from client when user hasn't manually edited it.
+  useEffect(() => {
+    if (placeOfSupplyTouched) return;
+    if (!selectedClient) return;
+    const def = selectedClient.is_international
+      ? selectedClient.country || ""
+      : selectedClient.state || "";
+    if (def) setPlaceOfSupply(def);
+  }, [selectedClient, placeOfSupplyTouched]);
+
+  // Default export_type when client switches to international
+  useEffect(() => {
+    if (!isInternational) {
+      if (exportType !== "") setExportType("");
+      return;
+    }
+    if (!exportType) {
+      setExportType(companyLutEnabled ? "lut" : "with_tax");
+    } else if (exportType === "lut" && !companyLutEnabled) {
+      setExportType("with_tax");
+    }
+  }, [isInternational, companyLutEnabled, exportType]);
+
   const calcTax = useCallback(() => {
-    if (isInternational) return { cgst: 0, sgst: 0, igst: 0 };
+    if (isInternational) {
+      // LUT export → 0%, with-tax export → IGST on item gst_rate
+      if (exportType === "with_tax") {
+        let totalIgst = 0;
+        for (const item of items) {
+          totalIgst += item.quantity * item.rate * (item.gst_rate / 100);
+        }
+        return { cgst: 0, sgst: 0, igst: Math.round(totalIgst * 100) / 100 };
+      }
+      return { cgst: 0, sgst: 0, igst: 0 };
+    }
     let totalCgst = 0, totalSgst = 0, totalIgst = 0;
     for (const item of items) {
       const amount = item.quantity * item.rate;
@@ -101,7 +150,7 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
       sgst: Math.round(totalSgst * 100) / 100,
       igst: Math.round(totalIgst * 100) / 100,
     };
-  }, [items, isInternational, selectedClient, companyState]);
+  }, [items, isInternational, selectedClient, companyState, exportType]);
 
   const tax = calcTax();
   const total = subtotal + tax.cgst + tax.sgst + tax.igst;
@@ -131,13 +180,18 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
     try {
       const url = invoiceId ? `/api/invoices/${invoiceId}` : "/api/invoices";
       const method = invoiceId ? "PUT" : "POST";
+      const noTaxOnLines = isInternational && exportType !== "with_tax";
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           client_id: clientId, invoice_date: invoiceDate, due_date: dueDate,
-          items: items.map((i) => ({ ...i, gst_rate: isInternational ? 0 : i.gst_rate })),
+          items: items.map((i) => ({ ...i, gst_rate: noTaxOnLines ? 0 : i.gst_rate })),
           status,
+          place_of_supply: placeOfSupply,
+          export_type: isInternational ? exportType : "",
+          notes,
+          po_reference: poReference,
         }),
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed to save invoice"); }
@@ -230,10 +284,86 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
         </div>
       )}
 
+      {/* Place of Supply + PO Reference */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Place of Supply
+            <span className="text-xs text-gray-400 font-normal ml-2">
+              {isInternational ? "country" : "state"}, auto-filled from client
+            </span>
+          </label>
+          <input
+            value={placeOfSupply}
+            onChange={(e) => { setPlaceOfSupply(e.target.value); setPlaceOfSupplyTouched(true); }}
+            placeholder={isInternational ? "e.g., Ireland" : "e.g., Tamil Nadu"}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            PO Reference
+            <span className="text-xs text-gray-400 font-normal ml-2">optional</span>
+          </label>
+          <input
+            value={poReference}
+            onChange={(e) => setPoReference(e.target.value)}
+            placeholder="Customer PO number, e.g., PO/45624"
+            className={inputClass}
+          />
+        </div>
+      </div>
+
       {isInternational && (
-        <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-700">
-          <Globe className="w-4 h-4 flex-shrink-0" />
-          International client — GST will be 0%
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-blue-900">
+            <Globe className="w-4 h-4" />
+            Export of services
+          </div>
+          <p className="text-xs text-blue-800">
+            Choose how this export is being treated for GST purposes:
+          </p>
+          <div className="space-y-2">
+            <label className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer border ${exportType === "lut" ? "border-violet-300 bg-white" : "border-transparent hover:bg-white/50"} ${!companyLutEnabled ? "opacity-50 cursor-not-allowed" : ""}`}>
+              <input
+                type="radio"
+                name="export_type"
+                value="lut"
+                checked={exportType === "lut"}
+                disabled={!companyLutEnabled}
+                onChange={() => companyLutEnabled && setExportType("lut")}
+                className="mt-0.5 text-violet-600"
+              />
+              <div className="flex-1 text-xs">
+                <div className="font-semibold text-gray-900">Without payment of tax (LUT)</div>
+                <div className="text-gray-500 mt-0.5">
+                  0% IGST. Prints &ldquo;EXPORT OF SERVICES WITHOUT PAYMENT OF TAX UNDER LUT&rdquo; with ARN on the invoice.
+                </div>
+                {!companyLutEnabled && (
+                  <div className="text-amber-700 mt-1">⚠ LUT not enabled in Settings — pick this only after configuring it.</div>
+                )}
+                {companyLutEnabled && companyLutArn && (
+                  <div className="text-gray-400 mt-1 font-mono">ARN: {companyLutArn}</div>
+                )}
+              </div>
+            </label>
+            <label className={`flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer border ${exportType === "with_tax" ? "border-violet-300 bg-white" : "border-transparent hover:bg-white/50"}`}>
+              <input
+                type="radio"
+                name="export_type"
+                value="with_tax"
+                checked={exportType === "with_tax"}
+                onChange={() => setExportType("with_tax")}
+                className="mt-0.5 text-violet-600"
+              />
+              <div className="flex-1 text-xs">
+                <div className="font-semibold text-gray-900">With payment of IGST</div>
+                <div className="text-gray-500 mt-0.5">
+                  Charge IGST on each line item; refund claimable. Use only if you do not have an active LUT.
+                </div>
+              </div>
+            </label>
+          </div>
         </div>
       )}
 
@@ -261,9 +391,20 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
                       placeholder="Service description" className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm focus:ring-violet-500 focus:border-violet-500" />
                   </td>
                   <td className="px-2 py-1.5">
-                    <input type="number" value={isInternational ? 0 : item.gst_rate} disabled={!!isInternational}
-                      onChange={(e) => updateItem(i, "gst_rate", Number(e.target.value))} tabIndex={isInternational ? -1 : undefined}
-                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-right focus:ring-violet-500 focus:border-violet-500 disabled:bg-gray-100 disabled:text-gray-400" />
+                    {(() => {
+                      const noTax = isInternational && exportType !== "with_tax";
+                      const shown = noTax ? 0 : item.gst_rate;
+                      return (
+                        <input
+                          type="number"
+                          value={shown}
+                          disabled={noTax}
+                          onChange={(e) => updateItem(i, "gst_rate", Number(e.target.value))}
+                          tabIndex={noTax ? -1 : undefined}
+                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-right focus:ring-violet-500 focus:border-violet-500 disabled:bg-gray-100 disabled:text-gray-400"
+                        />
+                      );
+                    })()}
                   </td>
                   <td className="px-2 py-1.5">
                     <input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(i, "quantity", Math.max(1, Number(e.target.value)))}
@@ -302,13 +443,13 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
             <span className="text-gray-500">Subtotal</span>
             <span className="font-medium">{formatCurrency(subtotal, currency)}</span>
           </div>
-          {!isInternational && tax.cgst > 0 && (
+          {tax.cgst > 0 && (
             <>
               <div className="flex justify-between"><span className="text-gray-500">CGST</span><span>{formatCurrency(tax.cgst, currency)}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">SGST</span><span>{formatCurrency(tax.sgst, currency)}</span></div>
             </>
           )}
-          {!isInternational && tax.igst > 0 && (
+          {tax.igst > 0 && (
             <div className="flex justify-between"><span className="text-gray-500">IGST</span><span>{formatCurrency(tax.igst, currency)}</span></div>
           )}
           <div className="flex justify-between border-t border-gray-200 pt-2 font-bold text-base">
@@ -316,6 +457,20 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
             <span className="text-violet-700">{formatCurrency(total, currency)}</span>
           </div>
         </div>
+      </div>
+
+      {/* Additional notes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          Additional Notes <span className="text-xs text-gray-400 font-normal ml-1">(optional, printed on PDF)</span>
+        </label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          placeholder="e.g., Payment terms, delivery instructions"
+          className={inputClass}
+        />
       </div>
 
       {/* Actions */}

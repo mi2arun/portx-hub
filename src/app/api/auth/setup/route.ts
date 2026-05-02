@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebase-admin";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 export async function GET() {
   const result = await adminAuth.listUsers(1);
@@ -24,14 +23,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Create user in Firebase Auth
     const email = username.includes("@") ? username : `${username}@portxhub.local`;
     await adminAuth.createUser({ email, password, displayName: username });
 
-    // Seed company data if not exists
-    const companyDoc = await adminDb.collection("company").doc("default").get();
-    if (!companyDoc.exists) {
-      await adminDb.collection("company").doc("default").set({
+    // Seed default companies if not present
+    const companiesSnap = await adminDb.collection("companies").limit(1).get();
+    if (companiesSnap.empty) {
+      await adminDb.collection("companies").add({
         name: "Portx Infotech Private Limited",
         address: "2/394, 5th Street, Kamaraj Colony, Chromepet, Chennai - 600 044, Tamil Nadu, India",
         state: "Tamil Nadu",
@@ -50,6 +48,28 @@ export async function POST(request: Request) {
         cin: "",
         invoice_prefix: "A",
         invoice_next_number: 1,
+        fy_start_month: 4,
+      });
+      await adminDb.collection("companies").add({
+        name: "Flowstack Technologies Private Limited",
+        address: "",
+        state: "",
+        country: "India",
+        gstin: "",
+        pan: "",
+        hsn_code: "",
+        bank_name: "",
+        account_name: "",
+        account_number: "",
+        ifsc: "",
+        swift_code: "",
+        logo_path: "/portx-logo.png",
+        email: "",
+        phone: "",
+        cin: "",
+        invoice_prefix: "F",
+        invoice_next_number: 1,
+        fy_start_month: 4,
       });
     }
 

@@ -6,7 +6,7 @@ import Navbar from "./Navbar";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLoginPage = pathname === "/login";
+  const isFullscreenPage = pathname === "/login" || pathname === "/select-company";
 
   // Register service worker
   useEffect(() => {
@@ -15,7 +15,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  if (isLoginPage) {
+  if (isFullscreenPage) {
     return <>{children}</>;
   }
 
