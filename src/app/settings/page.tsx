@@ -5,6 +5,7 @@ import { Building2, Landmark, Hash, Loader2, Check, CalendarDays, Mail, Plus, Tr
 import { ref as storageRef, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { clientStorage } from "@/lib/firebase-client";
 import BankLetterButton from "@/components/BankLetterButton";
+import { SettingsSkeleton } from "@/components/Skeleton";
 
 type BankAccount = {
   id: string;
@@ -98,6 +99,7 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [companies, setCompanies] = useState<CompanyListItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showAddCompany, setShowAddCompany] = useState(false);
@@ -107,7 +109,10 @@ export default function SettingsPage() {
   const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
-    fetch("/api/settings").then((r) => r.json()).then((data) => {
+    Promise.all([
+      fetch("/api/settings").then((r) => r.json()).catch(() => null),
+      fetch("/api/companies").then((r) => r.json()).catch(() => []),
+    ]).then(([data, list]) => {
       if (data) {
         // Spread DEFAULTS first so any field missing from the doc stays defined
         // (otherwise controlled inputs flip to uncontrolled).
@@ -119,8 +124,9 @@ export default function SettingsPage() {
         });
         setActiveId(data.id || null);
       }
+      if (Array.isArray(list)) setCompanies(list);
+      setLoading(false);
     });
-    loadCompanies();
   }, []);
 
   function updateBank(id: string, field: keyof BankAccount, value: string | boolean) {
@@ -270,6 +276,10 @@ export default function SettingsPage() {
 
   const inputClass = "w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:ring-violet-500 focus:border-violet-500 placeholder:text-gray-400";
   const labelClass = "block text-sm font-medium text-gray-700 mb-1.5";
+
+  if (loading) {
+    return <SettingsSkeleton />;
+  }
 
   return (
     <div>
