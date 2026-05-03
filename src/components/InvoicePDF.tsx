@@ -334,9 +334,9 @@ export default function InvoicePDF({ invoice, items, company, logoSrc }: Invoice
             {logoSrc ? (
               <Image
                 src={logoSrc}
-                /* Only height is set so the renderer keeps native aspect ratio.
-                   maxWidth caps unusually wide banner logos. */
-                style={{ height: 34, maxWidth: 160, marginBottom: 6 }}
+                /* Both dimensions plus objectFit:contain — react-pdf scales the
+                   image to fit the box while preserving aspect ratio. */
+                style={{ width: 110, height: 36, objectFit: "contain", marginBottom: 6 }}
               />
             ) : null}
             <Text style={s.companyName}>{company.name}</Text>

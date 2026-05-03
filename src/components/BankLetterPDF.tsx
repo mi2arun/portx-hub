@@ -26,7 +26,7 @@ const s = StyleSheet.create({
 
   // Header (logo only — clean letterhead style)
   logoWrap: { marginBottom: 36 },
-  logo: { height: 42, maxWidth: 160 },
+  logo: { width: 130, height: 44, objectFit: "contain" },
 
   // Title block
   title: {
