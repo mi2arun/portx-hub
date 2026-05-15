@@ -169,7 +169,7 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
-  async function handleSubmit(status: string) {
+  async function handleSubmit() {
     setError("");
     if (!clientId) { setError("Please select a client"); return; }
     if (items.some((i) => !i.description.trim())) { setError("Please fill all item descriptions"); return; }
@@ -181,6 +181,9 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
       const url = invoiceId ? `/api/invoices/${invoiceId}` : "/api/invoices";
       const method = invoiceId ? "PUT" : "POST";
       const noTaxOnLines = isInternational && exportType !== "with_tax";
+      // New invoices are always created as drafts; sending is a separate
+      // action on the detail page. Edits preserve the existing status.
+      const status = invoiceId ? (initialData?.status || "draft") : "draft";
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -479,14 +482,10 @@ export default function InvoiceForm({ invoiceId, initialData }: InvoiceFormProps
           className="px-5 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
           Cancel
         </button>
-        <button type="button" onClick={() => handleSubmit("draft")} disabled={saving}
-          className="px-5 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-          {saving ? "Saving..." : "Save as Draft"}
-        </button>
-        <button type="button" onClick={() => handleSubmit("sent")} disabled={saving}
+        <button type="button" onClick={handleSubmit} disabled={saving}
           className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-50 shadow-sm">
           {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-          {saving ? "Saving..." : invoiceId ? "Update" : "Create & Send"}
+          {saving ? "Saving..." : invoiceId ? "Update" : "Create Invoice"}
         </button>
       </div>
     </div>

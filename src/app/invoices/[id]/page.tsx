@@ -68,6 +68,8 @@ export default function ViewInvoicePage() {
   const [data, setData] = useState<InvoiceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [cloning, setCloning] = useState(false);
+  const [actionError, setActionError] = useState("");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [paymentError, setPaymentError] = useState("");
@@ -109,18 +111,34 @@ export default function ViewInvoicePage() {
   }
 
   async function handleClone() {
-    const res = await fetch("/api/invoices", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: data!.invoice.client_id,
-        invoice_date: new Date().toISOString().split("T")[0],
-        due_date: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-        items: data!.items.map((i) => ({ description: i.description, quantity: i.quantity, rate: i.rate, gst_rate: i.gst_rate })),
-        status: "draft",
-      }),
-    });
-    const inv = await res.json();
-    router.push(`/invoices/${inv.id}`);
+    setActionError("");
+    setCloning(true);
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_id: data!.invoice.client_id,
+          invoice_date: new Date().toISOString().split("T")[0],
+          due_date: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+          items: data!.items.map((i) => ({ description: i.description, quantity: i.quantity, rate: i.rate, gst_rate: i.gst_rate })),
+          status: "draft",
+          place_of_supply: data!.invoice.place_of_supply || "",
+          export_type: data!.invoice.export_type || "",
+          notes: data!.invoice.notes || "",
+          po_reference: data!.invoice.po_reference || "",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Clone failed (${res.status})`);
+      }
+      const inv = await res.json();
+      if (!inv.id) throw new Error("Clone failed: invalid response");
+      router.push(`/invoices/${inv.id}`);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Clone failed");
+      setCloning(false);
+    }
   }
 
   async function handleRecordPayment() {
@@ -268,8 +286,9 @@ export default function ViewInvoicePage() {
             className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
             <Mail className="w-3.5 h-3.5" /> Email
           </button>
-          <button onClick={handleClone} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Copy className="w-3.5 h-3.5" /> Clone
+          <button onClick={handleClone} disabled={cloning}
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            {cloning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />} Clone
           </button>
           <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
             <Printer className="w-3.5 h-3.5" /> Print
@@ -282,6 +301,10 @@ export default function ViewInvoicePage() {
           )}
         </div>
       </div>
+
+      {actionError && (
+        <div className="mb-4 bg-red-50 border border-red-100 rounded-lg p-3 text-sm text-red-600 no-print">{actionError}</div>
+      )}
 
       {/* Invoice Preview */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 sm:p-8">

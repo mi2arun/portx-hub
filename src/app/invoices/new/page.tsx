@@ -13,7 +13,7 @@ export default function NewInvoicePage() {
           Back to invoices
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Create New Invoice</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Fill in the details below to create a new invoice</p>
+        <p className="text-sm text-gray-500 mt-0.5">Saved as a draft. Mark it sent or email it from the invoice page.</p>
       </div>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
         <InvoiceForm />
