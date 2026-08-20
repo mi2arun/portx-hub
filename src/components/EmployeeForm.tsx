@@ -236,18 +236,22 @@ export default function EmployeeForm({ employee }: { employee?: Employee }) {
             <input value={form.aadhaar} onChange={(e) => set("aadhaar")(e.target.value.replace(/\D/g, ""))}
               placeholder="12-digit number" className={inputClass} maxLength={12} />
           </div>
-          <div>
-            <label className={labelClass}>UAN (PF)</label>
-            <input value={form.uan} onChange={(e) => set("uan")(e.target.value)} className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}>PF Number</label>
-            <input value={form.pf_number} onChange={(e) => set("pf_number")(e.target.value)} className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}>ESI Number</label>
-            <input value={form.esi_number} onChange={(e) => set("esi_number")(e.target.value)} className={inputClass} />
-          </div>
+          {PF_ESI_ENABLED && (
+            <>
+              <div>
+                <label className={labelClass}>UAN (PF)</label>
+                <input value={form.uan} onChange={(e) => set("uan")(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>PF Number</label>
+                <input value={form.pf_number} onChange={(e) => set("pf_number")(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>ESI Number</label>
+                <input value={form.esi_number} onChange={(e) => set("esi_number")(e.target.value)} className={inputClass} />
+              </div>
+            </>
+          )}
         </div>
       </Section>
 

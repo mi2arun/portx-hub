@@ -238,9 +238,11 @@ export default function EmployeeDetailPage({ params }: { params: Promise<{ id: s
             <InfoCard title="Statutory IDs" icon={ShieldCheck} items={[
               { label: "PAN", value: employee.pan },
               { label: "Aadhaar", value: employee.aadhaar ? "XXXX XXXX " + employee.aadhaar.slice(-4) : "" },
-              { label: "UAN", value: employee.uan },
-              { label: "PF Number", value: employee.pf_number },
-              { label: "ESI Number", value: employee.esi_number },
+              ...(PF_ESI_ENABLED ? [
+                { label: "UAN", value: employee.uan },
+                { label: "PF Number", value: employee.pf_number },
+                { label: "ESI Number", value: employee.esi_number },
+              ] : []),
             ]} />
             <InfoCard title="Salary Bank Account" icon={Landmark} items={[
               { label: "Bank", value: employee.bank_name },

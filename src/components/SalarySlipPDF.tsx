@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import { numberToWordsINR } from "@/lib/amount-to-words";
-import { formatMonth } from "@/lib/payroll";
+import { formatMonth, PF_ESI_ENABLED } from "@/lib/payroll";
 import type { Employee, SalarySlip } from "@/lib/types";
 
 const dark = "#111827";
@@ -141,10 +141,10 @@ export default function SalarySlipPDF({ company, employee, slip, logoSrc }: Sala
       { label: "Date of Joining", value: formatDate(employee?.date_of_joining || "") || "—" },
       { label: "PAN", value: employee?.pan || "—" },
     ],
-    [
+    ...(PF_ESI_ENABLED ? [[
       { label: "UAN", value: employee?.uan || "—" },
       { label: "ESI Number", value: employee?.esi_number || "—" },
-    ],
+    ]] : []),
     [
       { label: "Bank", value: employee?.bank_name || "—" },
       { label: "Account No.", value: maskAccount(employee?.bank_account_number || "") || "—" },
