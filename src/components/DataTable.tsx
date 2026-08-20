@@ -20,6 +20,7 @@ type DataTableProps<T> = {
   searchValue?: string;
   emptyMessage?: string;
   footer?: React.ReactNode;
+  onRowClick?: (row: T) => void;
 };
 
 export default function DataTable<T>({
@@ -29,6 +30,7 @@ export default function DataTable<T>({
   searchValue,
   emptyMessage = "No data found",
   footer,
+  onRowClick,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
 
@@ -99,7 +101,11 @@ export default function DataTable<T>({
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50/50">
+                <tr
+                  key={row.id}
+                  className={`hover:bg-gray-50/50 ${onRowClick ? "cursor-pointer" : ""}`}
+                  onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}

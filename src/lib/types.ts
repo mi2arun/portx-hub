@@ -202,5 +202,126 @@ export type Document = {
   file_type: string;
   notes: string;
   client_id: string;
+  /** Set when the document belongs to an employee's file (HR docs). */
+  employee_id?: string;
   uploaded_at: string;
 };
+
+// ---------------------------------------------------------------------------
+// Employee management
+// ---------------------------------------------------------------------------
+
+/** All amounts are MONTHLY figures in INR. */
+export type SalaryStructure = {
+  basic: number;
+  hra: number;
+  conveyance_allowance: number;
+  medical_allowance: number;
+  special_allowance: number;
+  other_allowance: number;
+  // Deductions
+  pf_employee: number;       // EPF — employee share (12% of basic, wage ceiling ₹15,000)
+  pf_employer: number;       // EPF — employer share (part of CTC, not deducted from gross)
+  esi_employee: number;      // ESI — employee share (0.75% of gross if gross ≤ ₹21,000)
+  esi_employer: number;      // ESI — employer share (3.25%, part of CTC)
+  professional_tax: number;  // state-specific slab
+  tds: number;               // monthly income-tax deduction
+};
+
+export const EMPTY_SALARY_STRUCTURE: SalaryStructure = {
+  basic: 0, hra: 0, conveyance_allowance: 0, medical_allowance: 0,
+  special_allowance: 0, other_allowance: 0,
+  pf_employee: 0, pf_employer: 0, esi_employee: 0, esi_employer: 0,
+  professional_tax: 0, tds: 0,
+};
+
+export const EMPLOYMENT_TYPES = [
+  { value: "full_time", label: "Full Time" },
+  { value: "part_time", label: "Part Time" },
+  { value: "intern", label: "Intern" },
+  { value: "contract", label: "Contract" },
+] as const;
+
+export const EMPLOYEE_STATUSES = [
+  { value: "offered", label: "Offered" },
+  { value: "active", label: "Active" },
+  { value: "resigned", label: "Resigned" },
+  { value: "terminated", label: "Terminated" },
+] as const;
+
+export type Employee = {
+  id: string;
+  company_id: string;
+  employee_code: string;       // e.g. "PIPL-001"
+  name: string;
+  email: string;
+  phone: string;
+  designation: string;
+  department: string;
+  employment_type: string;     // full_time | part_time | intern | contract
+  status: string;              // offered | active | resigned | terminated
+  date_of_joining: string;     // YYYY-MM-DD
+  date_of_leaving: string;
+  dob: string;
+  gender: string;
+  address: string;
+  work_location: string;
+  // Statutory identifiers
+  pan: string;
+  aadhaar: string;
+  uan: string;                 // PF Universal Account Number
+  pf_number: string;
+  esi_number: string;
+  // Salary bank account
+  bank_name: string;
+  bank_account_number: string;
+  bank_ifsc: string;
+  // Compensation
+  annual_ctc: number;
+  salary: SalaryStructure;
+  // Offer details
+  offer_date: string;
+  offer_valid_until: string;
+  probation_months: number;
+  notice_period_days: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SlipLine = { label: string; amount: number };
+
+export type SalarySlip = {
+  id: string;
+  company_id: string;
+  employee_id: string;
+  employee_code: string;
+  employee_name: string;
+  designation: string;
+  department: string;
+  month: string;               // "YYYY-MM"
+  total_days: number;          // calendar days in the month
+  paid_days: number;
+  lop_days: number;            // loss-of-pay days
+  earnings: SlipLine[];
+  deductions: SlipLine[];
+  gross_earnings: number;
+  total_deductions: number;
+  net_pay: number;
+  payment_date: string;
+  payment_mode: string;
+  notes: string;
+  created_at: string;
+};
+
+export const EMPLOYEE_DOC_CATEGORIES = [
+  "Offer Letter",
+  "Appointment Letter",
+  "Resume",
+  "ID Proof",
+  "Educational Certificates",
+  "Experience Letters",
+  "Bank Proof",
+  "Photo",
+  "Payslip",
+  "Other",
+] as const;

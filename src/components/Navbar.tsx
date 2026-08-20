@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   FolderOpen,
+  ContactRound,
 } from "lucide-react";
 import CompanySwitcher from "./CompanySwitcher";
 
@@ -22,6 +23,7 @@ const links = [
   { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/clients", label: "Clients", icon: Users },
+  { href: "/employees", label: "Employees", icon: ContactRound },
   { href: "/documents", label: "Documents", icon: FolderOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

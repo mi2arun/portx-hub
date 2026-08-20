@@ -2,12 +2,18 @@ import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 import { requireActiveCompanyId } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: Request) {
   const companyId = await requireActiveCompanyId();
+  const url = new URL(request.url);
+  const employeeId = url.searchParams.get("employee_id");
+
   const snapshot = await adminDb.collection("documents")
     .where("company_id", "==", companyId).get();
   const documents = snapshot.docs
     .map((doc) => ({ id: doc.id, ...doc.data() }))
+    // Employee HR documents live on the employee page; the general Documents
+    // page only shows company-level files.
+    .filter((d: any) => (employeeId ? d.employee_id === employeeId : !d.employee_id))
     .sort((a: any, b: any) => (b.uploaded_at || "").localeCompare(a.uploaded_at || ""));
   return NextResponse.json(documents);
 }
@@ -15,7 +21,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const companyId = await requireActiveCompanyId();
   const body = await request.json();
-  const { name, category, file_name, file_url, file_size, file_type, notes, client_id } = body;
+  const { name, category, file_name, file_url, file_size, file_type, notes, client_id, employee_id } = body;
 
   if (!name || !file_url) {
     return NextResponse.json({ error: "Name and file URL are required" }, { status: 400 });
@@ -31,6 +37,7 @@ export async function POST(request: Request) {
     file_type: file_type || "",
     notes: notes || "",
     client_id: client_id || "",
+    employee_id: employee_id || "",
     uploaded_at: new Date().toISOString(),
   };
 
